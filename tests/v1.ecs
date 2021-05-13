@@ -1,0 +1,76 @@
+# ECS Lang (Extended Covariant Script)
+import parsergen,  
+       codec.json,
+       covscript.*, 
+       network.tcp.x as tcp_socket
+
+var a = new tcp_socket.get_type(){"192.168.233.233", 3306}, b = gcnew array
+
+if a > 0
+    system.out.println("a")
+else if a == 0 &&
+         b != 0 &&!
+           c >= 0
+    system.out.println("b")
+    if(z2>0)
+        --z2
+    end
+else
+    system.out.println("c"); {syntax.cond_or(
+        {syntax.term("("), syntax.ref("expr"), syntax.term(")")},
+        {syntax.ref("object"), syntax.optional(syntax.ref("factor_s"))},
+        {syntax.term("{"), syntax.optional(syntax.ref("args")), syntax.term("}")},
+        {syntax.token("str")},
+        {syntax.token("num")}
+    )}
+    a.b(c[0], d.e())["Hello"].world()
+    *(a->hello)("World!").text
+end
+
+test([b, =c](ttx : number, =xxx){
+    if(xj)
+        if(z2>0)
+            --z2
+        end
+    else
+        if(z1>0)
+            --z1
+        end
+    end
+})
+
+function test(a : string, b : number, =c)
+{
+    return fuck_you()
+}
+
+struct xxxx
+    var a = 10
+end
+
+foreach it in lexical_set do rule = it
+
+a = "Hello" : "world"
+
+b = [](...xxx)->xxx > 1 ? self(xxx - 2) + self(xxx - 1) : 1
+
+namespace xxx
+    using json.*, tcp_socket
+    namespace xxx
+        var a = 10
+    end
+end
+
+for i = 0; i < 10; i += 1 do test({1, 3, 5, 7}, [](lhs, rhs){
+    return lhs < rhs;
+})
+
+try
+    xxxx()
+catch e:db.database_error
+    def()
+catch e:db.index_range_error
+    abc()
+catch e
+    throw
+end

@@ -1,0 +1,57 @@
+# Extended Covariant Script Header: v1.0.1
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Copyright (C) 2017-2021 Michael Lee(李登淳)
+#
+# Email:   lee@covariant.cn, mikecovlee@163.com
+# Github:  https://github.com/mikecovlee
+# Website: http://covscript.org.cn
+
+package ecs
+
+function param_new(type, args)
+    var data = new type
+    data.construct(args...)
+    return move(data)
+end
+
+function param_gcnew(type, args)
+    var data = gcnew type
+    data->construct(args...)
+    return move(data)
+end
+
+function check_type(name, id, type)
+    if typeid id != typeid type
+        throw runtime.exception("Wrong Type for function argument \"" + name + "\".")
+    end
+end
+
+function init_lambda(...args)
+    link func = args.pop_front()
+    return param_new(func, args).call
+end
+
+var current_except = null
+
+function throw_exception(data)
+    current_except = data
+    throw runtime.exception("__ecs_except__")
+end
+
+function get_exception()
+    var except = null
+    swap(except, current_except)
+    return move(except)
+end

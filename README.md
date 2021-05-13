@@ -1,2 +1,1 @@
-# ecs
-Extended Covariant Script(CovScript 4)
+# Extended Covariant Script(CovScript 4)
