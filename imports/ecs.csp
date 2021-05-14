@@ -20,6 +20,14 @@
 
 package ecs
 
+@begin
+var special_type = {
+    "function" : {typeid to_string, typeid system.out.println},
+    "exception" : {typeid runtime.exception("")},
+    "namespace" : {typeid system}
+}.to_hash_map()
+@end
+
 function param_new(type, args)
     var data = new type
     data.construct(args...)
@@ -32,9 +40,29 @@ function param_gcnew(type, args)
     return move(data)
 end
 
+function validate_type_s(id, type)
+    var type_of_id = typeid id
+    foreach it in special_type.at(type)
+        if it == type_of_id
+            return true
+        end
+    end
+    return false
+end
+
+function validate_type(id, type)
+    return typeid id == typeid type
+end
+
+function check_type_s(name, id, type)
+    if !validate_type_s(id, type)
+        throw runtime.exception("Wrong type for function argument \"" + name + "\".")
+    end
+end
+
 function check_type(name, id, type)
     if typeid id != typeid type
-        throw runtime.exception("Wrong Type for function argument \"" + name + "\".")
+        throw runtime.exception("Wrong type for function argument \"" + name + "\".")
     end
 end
 

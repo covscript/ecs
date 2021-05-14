@@ -3,7 +3,7 @@
     "Name": "ecs",
     "Info": "Extended CovScript(ECS Lang) Header",
     "Author": "Michael Lee",
-    "Version": "1.0.1",
+    "Version": "1.0.2",
     "Target": "imports/ecs.csp",
     "Dependencies": []
 }

@@ -22,18 +22,22 @@ var func = [a, =b](=n:number)
     return a + b
 }
 
+function call(f:function, args)
+    return f(args...)
+end
+
 var n = 10
 system.out.println("n = " + n)
 ([](n)->++n)(n)
 system.out.println("n = " + n)
-system.out.println("f = " + func(n))
+system.out.println("f = " + call(func, {n}))
 system.out.println("n = " + n)
 system.out.println("a = " + a)
 system.out.println("b = " + b)
 try
     func(system.in.input())
-catch e:my_except
-    system.out.println(e.xxxx)
-catch e
-    system.out.println(e.what)
+catch em:my_except
+    system.out.println(em.xxxx)
+catch er:exception
+    system.out.println(er.what)
 end

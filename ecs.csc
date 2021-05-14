@@ -176,13 +176,13 @@ function main(cmd_args)
         system.out.println("Error: invalid input file.")
         system.exit(0)
     end
+    var crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
     if output == null
         minmal = true
-    end
-    var crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
-    if system.file.exist("./.ecs_output/" + crc32)
-        var name = iostream.ifstream("./.ecs_output/" + crc32).getline()
-        system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+        if system.file.exist("./.ecs_output/" + crc32)
+            var name = iostream.ifstream("./.ecs_output/" + crc32).getline()
+            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+        end
     end
     var parser = new parsergen.generator
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
