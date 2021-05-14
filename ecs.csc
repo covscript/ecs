@@ -82,11 +82,11 @@ end
 function show_version()
 @begin
     system.out.println(
-        "Version: " + ecs_info.version + "\n" +
+        "Version: " + ecs_generator.ecs_info.version + "\n" +
         "Copyright (C) 2017-2021 Michael Lee. All rights reserved.\n" +
         "Please visit http://covscript.org.cn/ for more information.\n\n" +
         "Metadata:\n" +
-        "  STD Version: " + ecs_info.std_version + "\n"
+        "  STD Version: " + ecs_generator.ecs_info.std_version + "\n"
     )
 @end
     system.exit(0)
