@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.0.1
+# Extended Covariant Script Header: v1.0.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,11 +22,24 @@ package ecs
 
 @begin
 var special_type = {
-    "function" : {typeid to_string, typeid system.out.println},
+    "function"  : {typeid to_string, typeid system.out.println},
     "exception" : {typeid runtime.exception("")},
     "namespace" : {typeid system}
 }.to_hash_map()
 @end
+
+var current_except = null
+
+function throw_exception(data)
+    current_except = data
+    throw runtime.exception("__ecs_except__")
+end
+
+function get_exception()
+    var except = null
+    swap(except, current_except)
+    return move(except)
+end
 
 function param_new(type, args)
     var data = new type
@@ -56,30 +69,17 @@ end
 
 function check_type_s(name, id, type)
     if !validate_type_s(id, type)
-        throw runtime.exception("Wrong type for function argument \"" + name + "\".")
+        throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
     end
 end
 
 function check_type(name, id, type)
     if typeid id != typeid type
-        throw runtime.exception("Wrong type for function argument \"" + name + "\".")
+        throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
     end
 end
 
 function init_lambda(...args)
     link func = args.pop_front()
     return param_new(func, args).call
-end
-
-var current_except = null
-
-function throw_exception(data)
-    current_except = data
-    throw runtime.exception("__ecs_except__")
-end
-
-function get_exception()
-    var except = null
-    swap(except, current_except)
-    return move(except)
 end

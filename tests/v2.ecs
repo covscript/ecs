@@ -34,6 +34,7 @@ system.out.println("f = " + call(func, {n}))
 system.out.println("n = " + n)
 system.out.println("a = " + a)
 system.out.println("b = " + b)
+
 try
     func(system.in.input())
 catch em:my_except
