@@ -2,6 +2,7 @@
 import parsergen,  
        codec.json,
        covscript.*, 
+       covscript.abc, 
        network.tcp.x as tcp_socket
 
 var a = new tcp_socket.get_type(){"192.168.233.233", 3306}, b = gcnew array
@@ -55,7 +56,7 @@ a = "Hello" : "world"
 b = [](...xxx)->xxx > 1 ? self(xxx - 2) + self(xxx - 1) : 1
 
 namespace xxx
-    using json.*, tcp_socket
+    using json, tcp_socket
     namespace xxx
         var a = 10
     end

@@ -31,6 +31,10 @@ end
 
 import parsergen, ecs
 
+struct module_type
+    var list = new array
+end
+
 struct lambda_type
     var capture_list = new array
     var argument_list = null
@@ -123,7 +127,10 @@ class generator
     function visit_module_list(nodes)
         var idx = 0
         # Visit id token
-        target.print(nodes[idx++].data)
+        if stack.front.list.empty()
+            target.print(nodes[idx].data)
+        end
+        stack.front.list.push_back(nodes[idx++])
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ".")
             # Visit term "."
@@ -134,15 +141,10 @@ class generator
                 if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "*")
                     matched = true
                     # Visit term "*"
-                    if !stack.empty() && stack.front == "import_wildcard"
-                        stack.pop_front()
-                    else
-                        stack.push_front("import_wildcard")
-                    end
+                    stack.front.list.push_back(nodes[idx++])
                 end
                 if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "module-list")
                     matched = true
-                    target.print(".")
                     # Recursive Visit module-list
                     this.visit_module_list(nodes[idx++].nodes)
                 end
@@ -1467,7 +1469,15 @@ class generator
     function visit_using_list(nodes)
         var idx = 0
         # Recursive Visit module-list
+        stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
+        stack.front.list.pop_front()
+        if !stack.front.list.empty() && stack.front.list.back.data == "*"
+            error(stack.front.list.back.pos, "Can not use wildcard symbol in using statement.")
+        end
+        foreach it in stack.front.list
+            target.print("." + it.data) 
+        end
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
@@ -1534,13 +1544,23 @@ class generator
         var idx = 0, wildcard = false
         target.print("import ")
         # Recursive Visit module-list
+        stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
-        if !stack.empty() && stack.front == "import_wildcard"
-            wildcard = true
-            idx = 0
-            target.print("; using ")
-            # Recursive Visit module-list
-            this.visit_module_list(nodes[idx++].nodes)
+        if !stack.front.list.empty()
+            if stack.front.list.back.data == "*"
+                stack.front.list.pop_back()
+                wildcard = true
+                var str = "; using "
+                foreach it in stack.front.list
+                    str += it.data + "."
+                end
+                str.cut(1)
+                target.print(str)
+                stack.front.list.clear()
+            else
+                stack.front.list.pop_front()
+                foreach it in stack.front.list do target.print("." + it.data) 
+            end
         end
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "as")
@@ -1551,7 +1571,12 @@ class generator
             ++idx; target.print(" as ")
             # Visit id token
             target.print(nodes[idx++].data)
+        else
+            if !stack.front.list.empty()
+                target.print(" as " + stack.front.list.back.data)
+            end
         end
+        stack.pop_front()
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
