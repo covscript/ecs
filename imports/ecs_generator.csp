@@ -25,8 +25,8 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 3"
-    constant std_version = "210601"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 4"
+    constant std_version = "210602"
 end
 
 import parsergen, ecs
