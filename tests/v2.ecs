@@ -13,7 +13,7 @@ end
 var a = 0, b = 2
 var func = [a, =b](=n:number)
 {
-    if n < 0
+    if not n >= 0 && my_except is type
         throw new my_except{"Hello"}
     end
     --n
@@ -22,7 +22,7 @@ var func = [a, =b](=n:number)
     return a + b
 }
 
-function call(f:function, args)
+function call(f:function, args:array)
     return f(args...)
 end
 
@@ -30,7 +30,10 @@ var n = 10
 system.out.println("n = " + n)
 ([](n)->++n)(n)
 system.out.println("n = " + n)
-system.out.println("f = " + call(func, {n}))
+var r = call(func, {n})
+if r is number && r not string && r not namespace
+    system.out.println("f = " + r)
+end
 system.out.println("n = " + n)
 system.out.println("a = " + a)
 system.out.println("b = " + b)

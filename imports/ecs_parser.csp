@@ -263,7 +263,7 @@ var covscript_syntax = {
         syntax.ref("equal-expr"), syntax.optional(syntax.cond_or({syntax.term("&&")}, {syntax.term("and")}), syntax.ref("logic-and-expr"))
     },
     "equal-expr" : {
-        syntax.ref("relat-expr"), syntax.optional(syntax.cond_or({syntax.term("==")}, {syntax.term("!=")}), syntax.ref("equal-expr"))
+        syntax.ref("relat-expr"), syntax.optional(syntax.cond_or({syntax.term("==")}, {syntax.term("!=")}, {syntax.term("is")}, {syntax.term("not")}), syntax.ref("equal-expr"))
     },
     "relat-expr" : {
         syntax.ref("add-expr"), syntax.optional(syntax.cond_or({syntax.term(">")}, {syntax.term("<")}, {syntax.term(">=")}, {syntax.term("<=")}), syntax.ref("relat-expr"))
@@ -286,7 +286,8 @@ var covscript_syntax = {
         {syntax.term("*")},
         {syntax.term("&")},
         {syntax.term("-")},
-        {syntax.term("!")}
+        {syntax.term("!")},
+        {syntax.term("not")}
     )},
     "postfix-expr" : {
         syntax.cond_or({syntax.term("++")}, {syntax.term("--")}, {syntax.term("...")}), syntax.optional(syntax.ref("postfix-expr"))

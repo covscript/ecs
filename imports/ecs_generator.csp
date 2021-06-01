@@ -82,6 +82,27 @@ class generator
         end
         return null
     end
+    function get_id_of_equal_expr(nodes)
+        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "relat-expr"
+            nodes := nodes[0].nodes
+            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "add-expr"
+                nodes := nodes[0].nodes
+                if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "mul-expr"
+                    nodes := nodes[0].nodes
+                    if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "unary-expr"
+                        nodes := nodes[0].nodes
+                        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "prim-expr"
+                            nodes := nodes[0].nodes
+                            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "visit-expr"
+                                return get_id_of_visit_expr(nodes[0].nodes)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return null
+    end
     function visit_declaration(nodes)
         print_indent()
         var idx = 0
@@ -1881,30 +1902,52 @@ class generator
     end
     function visit_equal_expr(nodes)
         var idx = 0
-        # Recursive Visit relat-expr
-        this.visit_relat_expr(nodes[idx++].nodes)
-        # Optional
-        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "==" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "!=")
-            # Condition
-            block
-                var matched = false
-                if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "==")
-                    matched = true
-                    # Visit term "=="
-                    ++idx; target.print(" == ")
+        if nodes.size > 1 && typeid nodes[1] == typeid parsergen.token_type && (nodes[1].data == "is" || nodes[1].data == "not")
+            var type_id = get_id_of_equal_expr(nodes[2].nodes)
+            if type_id != null && ecs.special_type.exist(type_id)
+                if nodes[1].data == "not"
+                    target.print("!")
                 end
-                if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "!=")
-                    matched = true
-                    # Visit term "!="
-                    ++idx; target.print(" != ")
+                target.print("ecs.validate_type_s(")
+                this.visit_relat_expr(nodes[0].nodes)
+                target.print(", \"" + type_id + "\")")
+            else
+                target.print("typeid(")
+                this.visit_relat_expr(nodes[0].nodes)
+                if nodes[1].data == "is"
+                    target.print(") == typeid(")
+                else
+                    target.print(") != typeid(")
                 end
-                if !matched
-                	# Error
-                	return
-                end
+                this.visit_equal_expr(nodes[2].nodes)
+                target.print(")")
             end
-            # Recursive Visit equal-expr
-            this.visit_equal_expr(nodes[idx++].nodes)
+        else
+            # Recursive Visit relat-expr
+            this.visit_relat_expr(nodes[idx++].nodes)
+            # Optional
+            if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "==" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "!=")
+                # Condition
+                block
+                    var matched = false
+                    if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "==")
+                        matched = true
+                        # Visit term "=="
+                        ++idx; target.print(" == ")
+                    end
+                    if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "!=")
+                        matched = true
+                        # Visit term "!="
+                        ++idx; target.print(" != ")
+                    end
+                    if !matched
+                	    # Error
+                	    return
+                    end
+                end
+                # Recursive Visit equal-expr
+                this.visit_equal_expr(nodes[idx++].nodes)
+            end
         end
     end
     function visit_unary_op(nodes)
@@ -1946,6 +1989,11 @@ class generator
                 matched = true
                 # Visit term "!"
                 ++idx; target.print("!")
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "not")
+                matched = true
+                # Visit term "not"
+                ++idx; target.print("not ")
             end
             if !matched
             	# Error
@@ -2123,7 +2171,7 @@ class generator
             target.println("end")
             target.println("end")
         end
-        target.println(buff)
+        target.print(buff)
         return file_name
     end
 end
