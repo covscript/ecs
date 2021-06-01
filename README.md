@@ -37,4 +37,5 @@ Options:
 ## Compatibility Notice
 1. The program translated by ECS Compiler will depends on package `ecs`.
 2. The behavior of Lambda Expression will be very different
-3. Separated exception system. Please call `e = ecs.handle_exception(e)` to solve compatible problem in CovScript 3 when catch exception from ECS Packages
+3. Separated exception system. Please call `e = ecs.handle_exception(e)` to solve compatible problem in CovScript 3 when catch exception from ECS Packages.
+4. To support `new` and `gcnew` operator with arguments, please define `construct` function separately.
