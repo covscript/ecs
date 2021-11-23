@@ -1,0 +1,141 @@
+begin ::= stmts ;
+
+ignore ::= { ENDL } ;
+
+endline ::= ENDL | ';' ;
+
+stmts ::= {statement {ENDL}} ;
+
+decl_stmts ::= {declaration {ENDL}} ;
+
+endblock ::= end_stmt | else_stmt | until_stmt | catch_stmt ;
+
+statement ::= prep_stmt | package_stmt | import_stmt | var_stmt | block_stmt | namespace_stmt | using_stmt | if_stmt | switch_stmt | while_stmt | loop_stmt | for_stmt | foreach_stmt | control_stmt | function_stmt | return_stmt | try_stmt | throw_stmt | class_stmt | expr_stmt ;
+
+declaration ::= prep_stmt | namespace_stmt | var_stmt | using_stmt | function_stmt | class_stmt ;
+
+prep_stmt ::= PREP ENDL ;
+
+package_stmt ::= 'package' ID endline ;
+
+import_stmt ::= 'import' import_list endline ;
+
+module_list ::= ID ['.' ('*' | module_list)] ; 
+
+import_list ::= module_list ['as' ID ] [',' import_list] ;
+
+var_def ::= var_bind '=' basic_expr | var_list;
+
+var_stmt ::= ('var' | 'link' | 'constant') var_def endline ;
+
+var_bind ::= '(' var_bind_list {',' var_bind_list} ')' ;
+
+var_bind_list ::= ID | '...' | var_bind ;
+
+var_list ::= ID '=' single_expr [',' var_list];
+
+block_stmt ::= 'block' ENDL stmts 'end' ENDL;
+
+namespace_stmt ::= 'namespace' ID ENDL decl_stmts 'end' ENDL;
+
+using_stmt ::= 'using' using_list endline;
+
+using_list ::= module_list [',' using_list];
+
+if_stmt ::= 'if' basic_expr ENDL stmts {else_stmt stmts 'end' ENDL};
+
+else_stmt ::= 'else' ['if' basic_expr] ENDL ;
+
+switch_stmt ::= 'switch' basic_expr ENDL switch_stmts 'end' ENDL;
+
+switch_stmts ::= {switch_case | switch_default} {ENDL};
+
+switch_case ::= 'case' logic_or_expr ENDL stmts 'end' ENDL;
+
+switch_default ::= 'default' ENDL stmts 'end' ENDL;
+
+while_stmt ::= 'while' basic_expr ENDL stmts 'end' ENDL;
+
+loop_stmt ::= 'loop' ENDL stmts (until_stmt | 'end' | ENDL);
+
+until_stmt ::= 'until' basic_expr ENDL;
+
+for_stmt ::= 'for' [var_def] (';' | ',') [basic_expr] (';' | ',') [basic_expr] for_body;
+
+foreach_stmt ::= 'foreach' ID 'in' basic_expr for_body;
+
+for_body ::= ('do' basic_expr endline | ENDL stmts 'end' ENDL);
+
+function_stmt ::= 'function' ID '(' [argument_list] ')' ['override'] function_body;
+
+function_body ::= ('{' stmts '}' | ENDL stmts 'end' ENDL);
+
+return_stmt ::= 'return' [expr] endline;
+
+try_stmt ::= 'try' ENDL stmts {catch_stmt stmts} 'end' ENDL;
+
+catch_stmt ::= 'catch' ID [':' visit_expr]  ENDL;
+
+throw_stmt ::= 'throw' [expr] endline;
+
+class_stmt ::= ('class' | 'struct') ID ['extends' visit_expr] ENDL decl_stmts 'end' ENDL;
+
+control_stmt ::= ('break' | 'continue') endline;
+
+expr_stmt ::= expr endline;
+
+end_stmt ::= 'end' ENDL;
+
+expr ::= single_expr [',' expr];
+
+single_expr ::= lambda_expr | basic_expr;
+
+basic_expr ::= var_bind '=' cond_expr | cond_expr [asi_op single_expr];
+
+asi_op ::= '=' | ':=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' ;
+
+lambda_expr ::= '[' [capture_list] ']' '(' [argument_list] ')' lambda_body;
+
+capture_list ::= ['='] ID {',' capture_list} ;
+
+argument_list ::= '...' ID | ['='] ID [':'] visit_expr {',' argument_list};
+
+lambda_body ::= '{' {statement {ENDL}} '}' | '->' cond_expr;
+
+cond_expr ::= logic_or_expr [cond_postfix];
+
+cond_postfix ::= '?' logic_or_expr ':' cond_expr | ':' logic_or_expr;
+
+logic_or_expr ::= logic_and_expr [('||' | 'or') logic_or_expr];
+
+logic_and_expr ::= equal_expr [('&&' | 'and') logic_and_expr];
+
+equal_expr ::= relat_expr [('==' | '!=') equal_expr];
+
+relat_expr ::= add_expr [('>' | '<' | '>=' | '<=') relat_expr];
+
+add_expr ::= mul_expr [('+' | '-') add_expr];
+
+mul_expr ::= unary_expr [('*' | '/' | '%' | '^') mul_expr];
+
+unary_expr ::= unary_op unary_expr | ('new' | 'gcnew') unary_expr [array] | prim_expr [postfix_expr];
+
+unary_op ::= 'typeid' | '++' | '--' | '*' | '&' | '-' | '!';
+
+postfix_expr ::= ('++' | '--' | '...')  [postfix_expr];
+
+prim_expr ::= visit_expr | constant ;
+
+visit_expr ::= object [ ('->' | '.') visit_expr ];
+
+object ::= array [index] | STR [index] | 'local' | 'global' | element | CHAR;
+
+element ::= (ID | '(' single_expr ')') {fcall | index};
+
+constant ::= NUM | 'null' | 'true' | 'false';
+
+array ::= '{' [expr] '}';
+
+fcall ::= '(' [expr] ')';
+
+index ::= '[' basic_expr ']';

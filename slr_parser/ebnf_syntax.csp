@@ -1,0 +1,91 @@
+package ebnf_syntax
+
+import parsergen, regex
+
+constant syntax = parsergen.syntax
+
+@begin
+var ebnf_lexical = {
+    "id" : regex.build("^[a-z_]*$"),
+    "token" : regex.build("^[A-Z]*$"),
+    "brac" : regex.build("^(\\(|\\)|\\[|\\]|\\{|\\})$"),
+    "sig" : regex.build("^(:|::|(::)?=||\\||;)$"),
+    "slit" : regex.build("^(\'|\'([^\']|\\\\\')*\'?)$"),
+    "dlit" : regex.build("^(\"|\"([^\"]|\\\\\")*\"?)$"),
+    "ign" : regex.build("^([ \\f\\r\\t\\v\\n]+)$"),
+    "err" : regex.build("^(\"|\'|\\.\\.)$")
+}.to_hash_map()
+@end
+
+@begin
+var ebnf_syntax = {
+    "begin" : {
+        syntax.repeat(syntax.ref("statement"))
+    },
+    "statement" : {
+        syntax.ref("non_terminal_symbol"), syntax.ref("assign_op"), syntax.ref("declaration"), syntax.ref("end_op") 
+    },
+    "non_terminal_symbol":{
+        syntax.token("id")
+    },
+    "assign_op" : {
+        syntax.cond_or(
+            {syntax.term("::=")},
+            {syntax.term("=")}
+        )
+    },
+    "end_op" : {
+        syntax.cond_or(
+            {syntax.term(";")},
+            {syntax.term(".")}
+        )
+    },
+    "declaration" : {
+        syntax.ref("term"), syntax.repeat(syntax.term("|"), syntax.ref("term"))
+    },
+    "term" : {
+        syntax.ref("part"), syntax.repeat(syntax.optional(syntax.term(",")), syntax.ref("part"))
+    },
+    "part" : {
+        syntax.cond_or(
+            {syntax.ref("repeat_part")},
+            {syntax.ref("declaration_part")},
+            {syntax.ref("alternative_part")},
+            {syntax.ref("simple_part")}
+        )
+    },
+    "repeat_part" : {
+        syntax.term("{"), syntax.ref("declaration"), syntax.term("}")
+    },
+    "declaration_part" : {
+        syntax.term("("), syntax.ref("declaration"), syntax.term(")")
+    },
+    "alternative_part" : {
+        syntax.term("["), syntax.ref("declaration"), syntax.term("]")
+    },
+    "simple_part" : {
+        syntax.cond_or(
+            {syntax.ref("right_non_terminal_symbol")},
+            {syntax.ref("terminal_symbol")}
+        )
+    },
+    "right_non_terminal_symbol" : {
+        syntax.ref("non_terminal_symbol")
+    },
+    "terminal_symbol" : {
+        syntax.cond_or(
+            {syntax.token("slit")},
+            {syntax.token("dlit")},
+            {syntax.token("token")}
+        )
+    },
+    "non_terminal_symbol" : {
+        syntax.token("id")
+    }
+}.to_hash_map()
+@end
+
+var grammar = new parsergen.grammar
+grammar.lex = ebnf_lexical
+grammar.stx = ebnf_syntax
+grammar.ext = ".*\\.ebnf"

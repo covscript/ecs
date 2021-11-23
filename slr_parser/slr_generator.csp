@@ -1,0 +1,41 @@
+package tree_compress
+
+import parse_new_grammar
+
+class compress_tree
+    var tree = "";
+
+
+    function show_trees(node, depth)
+        foreach i in range(depth) do system.out.print("\t")
+        system.out.println(node.root)
+        foreach son in node.nodes do show_trees(son, depth + 1) 
+    end
+
+    function compress_tree(node)
+        
+        for iter = node.nodes.begin, iter != node.nodes.end, iter.next()
+            compress_tree(iter.data)
+            var dat = iter.data
+            if dat.nodes.size == 1 && dat.nodes[0].root == "NULL"
+                iter = node.nodes.erase(iter)
+                iter.prev()
+            end
+        end
+
+        # for iter = node.nodes.begin, iter != node.nodes.end, iter++
+        #     if iter.data.root == "%DELETED%"
+        #         iter = node.nodes.erase(iter)
+        #     end
+        # end
+
+    end
+    
+    function run(treenode)
+        tree = treenode
+        show_trees(tree, 0)
+        compress_tree(tree)
+        show_trees(tree, 0)
+    end
+
+end

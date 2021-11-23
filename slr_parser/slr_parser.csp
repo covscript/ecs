@@ -1,0 +1,321 @@
+import check_LR_grammar
+import parsergen
+
+package parse_new_grammar
+
+function print_header(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+    system.out.println(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+end
+
+class tree_type
+    var root = ""
+    var nodes = new array
+end
+
+struct parse_error
+    var text = ""
+    var pos = 0
+end
+
+class slr_parser_type
+    var code = ""
+    var enable_log = true
+    var code_buff = new array
+    var predict_table = new array
+    var lex_rule = new hash_map
+
+    var parsing_stack = new array
+    
+    var data_stack = new array
+    
+    var tree_stack = new array
+
+    var store_parsing_stack = new array
+
+    var store_data_stack = new array
+    
+    # var error_state = 0
+
+    # var error_parsing_stack_cache = new array
+
+    # var error_cache = new array
+
+    # var error_state = new array
+
+    var error_level = 0
+
+    var recover_info = new array
+
+    var error_log = new array
+
+    # var error_parsing_time = 0
+
+
+    # var in_error = false
+    
+
+    function show_stack_state()
+        print_header("SHOW PARSING STACKS")
+        system.out.println("Parsing stack: ")
+        system.out.print("\t")
+        foreach iter in parsing_stack do system.out.print(to_string(iter) + " ")
+        system.out.println("")
+        system.out.println("Input: ")
+        system.out.print("\t")
+        foreach iter in data_stack
+            if iter.type == "ENDL"
+                system.out.print(iter.type + " " + "\\n" + ",")
+            else
+                system.out.print(iter.type + " " + iter.data + ",")
+            end
+        end
+        system.out.println("")
+    end
+
+    function print_error(file, code, err)
+        foreach it in err
+            system.out.print("File \"" + file + "\", line " + (it.pos[1] + 1) + ": ")
+            system.out.println(it.text)
+            system.out.println("> " + code[it.pos[1]])
+            foreach i in range(it.pos[0] + 2) do system.out.print(' ')
+            system.out.print("^")
+            system.out.println("\n")
+        end
+    end
+
+    function add_error(str, pos)
+        var err = new parse_error
+        err.text = str
+        err.pos = pos
+        error_log.push_back(move(err))
+    end
+
+    function slr_lex()
+        var lexer = new parsergen.lexer_type
+        if enable_log
+            print_header("Begin Lexical Analysis...")
+        end
+        
+        var token_buff = lexer.run(lex_rule, code)
+        
+        # foreach it in token_buff do system.out.println("  Type = " + it.type + "\tData = " + it.data + "\tPos = (" + it.pos[0] + ", " + it.pos[1] + ")")
+        
+        if !lexer.error_log.empty()
+            
+            print_header("Compilation Error")
+           
+            print_error("file_path", code, lexer.error_log)
+        end
+
+        foreach dat in token_buff do data_stack.push_front(dat)
+        var eof = new parsergen.token_type
+        eof.type = "EOF"
+        eof.data = "%END%"
+        data_stack.push_front(eof)
+
+        var line = new string
+        foreach ch in code
+            if ch == '\n'
+                code_buff.push_back(line)
+                line.clear()
+                continue
+            end
+            line += ch
+        end
+    end
+
+    function change_type()
+    end
+
+    function slr_parse()
+
+        while true
+            if enable_log
+                show_stack_state()
+            end
+            #展示stack state
+            
+            var state = parsing_stack.back
+            var dat = data_stack.back
+            #获取两个栈的栈顶信息
+
+            #遗留问题需要修改
+            #判断是否到达结束
+            if dat.data != "%END%"
+                dat.data = "\'" + dat.data + "\'"
+            end
+             
+
+            # system.out.println("state: " + state + ",  data: " + dat.type + "  " + dat.data)
+            #展示state信息
+            
+            var tree_node = new tree_type
+
+            
+            #软关键字
+            if predict_table[state].exist(dat.type)
+                # system.out.println("type")
+                tree_node.root = dat.type
+                var data_node = new tree_type
+                data_node.root = string.substr(dat.data, 1, dat.data.size - 2)
+                tree_node.nodes.push_back(data_node)
+            end
+
+            if predict_table[state].exist(dat.data)
+                tree_node = new tree_type
+                # system.out.println("data")
+                tree_node.root = dat.data
+            end
+
+            if tree_node.root == ""
+                #恢复现场
+                parsing_stack = store_parsing_stack
+                data_stack = store_data_stack
+                # system.out.println("recover from shift")
+
+                #add_error
+                error_log.push_back("new error at : " + dat.pos[0] + "  " + dat.pos[1] + "  " + dat.type + "  " + dat.data)
+
+                #恢复错误
+                if error_level == 0
+                    error_level = 1
+                    foreach iter in predict_table[state]
+                        recover_info.push_back(iter)
+                    end
+                end
+
+                var recover_data = recover_info.pop_back()
+                var new_data = data_stack.pop_back()
+                if recover_data.first[0] == '\''
+                    new_data.data = string.substr(recover_data.first, 1, dat.data.size - 2)
+                else
+                    new_data.type = recover_data.first[0]
+                    new_data.data = "error"
+                end
+                continue
+            end
+            
+            var res = predict_table[state].at(tree_node.root)
+            
+            #遗留问题,需要更新数据
+            if tree_node.root[0] == '\''
+                tree_node.root = string.substr(dat.data, 1, dat.data.size-2)
+            end
+
+            # system.out.println("push dat: " + tree_node.root)
+
+
+
+            #移项
+            if typeid res != typeid check_LR_grammar.LR_type
+                # system.out.println("res is : " + res)
+                if res == -1
+                    system.out.print("END OF PARSING")
+                    break
+                end
+
+                parsing_stack.push_back(tree_node.root)
+                parsing_stack.push_back(res)
+                
+                data_stack.pop_back()
+
+                store_parsing_stack = parsing_stack
+
+                store_data_stack = data_stack
+                error_level = 0
+                #储存现场
+                # system.out.print("shift res ")
+
+                tree_stack.push_back(tree_node)
+                # system.out.println("tree stack push node " + tree_node.root)
+            else
+            #规约
+                var root_node = new tree_type
+                root_node.root = res.root
+
+                var vec = new array 
+                if res.origin_nodes.size == 1 && res.origin_nodes[0] == "NULL"
+                    var tree_node = new tree_type
+                    tree_node.root = "NULL"
+                    vec.push_back(tree_node)
+                else
+                    #消除指定长度项
+                    var del_time = res.origin_nodes.size
+                    #reduce
+                    for i = 0, i < del_time, i++
+                        #pop state
+                        parsing_stack.pop_back()
+                        #pop data
+                        parsing_stack.pop_back()
+
+                        var node = tree_stack.pop_back()
+                        vec.push_front(node)
+                    end
+                end
+
+                foreach node in vec do root_node.nodes.push_back(node)    
+                
+                var now_state = parsing_stack.back
+                #规约后到达新的状态
+                if predict_table[now_state].exist(res.root) && typeid predict_table[now_state].at(res.root) != typeid check_LR_grammar.LR_type
+                    parsing_stack.push_back(res.root)
+                    parsing_stack.push_back(predict_table[now_state].at(res.root))
+                    
+                    tree_stack.push_back(root_node)
+                    #system.out.println("tree stack push node " + root_node.root)
+                else
+                #恢复现场
+                parsing_stack = store_parsing_stack
+                data_stack = store_data_stack
+                # system.out.println("recover from shift")
+
+                #add_error
+                error_log.push_back("new state error at : " + dat.pos[0] + "  " + dat.pos[1] + "  " + dat.type + "  " + dat.data)
+
+                #恢复错误
+                if error_level == 0
+                    error_level = 1
+                    foreach iter in predict_table[state]
+                        recover_info.push_back(iter)
+                    end
+                end
+
+                var recover_data = recover_info.pop_back()
+                var new_data = data_stack.pop_back()
+                if recover_data.first[0] == '\''
+                    new_data.data = string.substr(recover_data.first, 1, dat.data.size - 2)
+                else
+                    new_data.type = recover_data.first[0]
+                    new_data.data = "error"
+                end
+                continue
+                    
+                end
+            end
+        end
+        # system.out.println("END PARSING")
+    end
+
+    function show_trees(node, depth)
+        foreach i in range(depth) do system.out.print("\t")
+        system.out.println(node.root)
+        foreach son in node.nodes do show_trees(son, depth + 1) 
+    end
+
+    function show_error()
+        foreach error in error_log do system.out.println(error)
+    end
+
+    #栈改用指针的模式
+    function run(input_code, input_predict_table, input_lex_rule, log_priv)
+        code = input_code
+        enable_log = log_priv
+        predict_table = input_predict_table
+        lex_rule = input_lex_rule
+        parsing_stack.push_back(0)
+    end
+end

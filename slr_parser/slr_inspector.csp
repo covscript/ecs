@@ -1,0 +1,976 @@
+package slr_inspector
+
+class tree_type 
+    var nodes = new array
+    var root = ""
+    var seq = ""
+end
+
+namespace LR_term_type
+@begin
+    constant
+        deduce = 0,
+        accept = 1,
+        shift = 2,
+        to_deduce = 3
+@end
+end
+
+class LR_type
+    var idx = -1
+    var root = ""
+    var nodes = new array
+    var origin_nodes = new array
+    var source_index = -1
+    var mark_pos = -1
+    var term_type = -1
+    var mark_before = ""
+    var mark_after = ""
+    var targets = new array
+    var Follow_post = -1
+end
+
+
+#to judge whether a node is non_terminal or not
+function is_non_terminal_symbol(str)
+    foreach iter in str
+        if iter == '\"'
+            return false
+        end
+        if iter == '\''
+            return false
+        end
+        if iter.isupper()
+            return false
+        end 
+    end
+
+    return true
+end
+
+
+class LR_term
+    #输入信息
+    var input_res = new array
+    
+    #输出信息
+    var result = new array
+
+    #First集
+    var first_map = new hash_map
+
+    #Follow集
+    var follow_map = new hash_map
+
+    var enable_log = true
+
+    function add_start_term(res)
+        #first_node
+
+        var begin_node = res.begin.data
+        var root = begin_node.root
+
+        #%该标识可以避免重名
+        var start_node = new tree_type
+        start_node.root = "%start%"
+        
+        var start_begin_node = new tree_type
+        start_begin_node.root = root
+
+        start_node.nodes.push_back(start_begin_node)
+        
+        input_res.push_front(start_node)
+    end
+
+    function show_first_follow_map(map)
+        foreach iter in map
+            system.out.print("TERM  " + iter.first + " : ")
+            foreach it in iter.second
+                system.out.print(it + "  ")
+            end
+            system.out.println("\n")
+        end
+    end
+
+    function add_map_element(map, key, value)
+        var set = new hash_set
+        # var new_key = false
+        if map.exist(key)
+            set.insert(value)
+            set = hash_set.merge(set, map.at(key))
+            map.at(key) = set
+        else
+            set.insert(value)
+            map.insert(key,set)
+        end
+        # return new_key
+    end
+
+    function cal_first_map()
+        var before_cal_map = first_map
+
+        foreach term in input_res
+            var root = term.root
+
+            if term.nodes.size == 1 && !is_non_terminal_symbol(term.nodes[0].root)
+                add_map_element(first_map, root, term.nodes[0].root)
+                continue
+            end
+
+            #A -> x1x2x3...xn
+            
+            var all_null = true
+
+            for i = 0, i < term.nodes.size, i++
+                var has_null = false
+                var now_node_root = term.nodes[i].root
+
+                if !is_non_terminal_symbol(now_node_root)
+                    #不会出现空结尾的式子
+                    all_null = false
+                    add_map_element(first_map, root, now_node_root)
+                    break
+                else
+                    #add First(xi) - ε to First(A)
+                    if !first_map.exist(now_node_root)
+                        #add_map_element(first_map, root, now_node_root)
+                        has_null = false
+                        all_null = false
+                        break
+                    else
+                        var now_node_set = first_map.at(now_node_root)
+                        foreach ele in now_node_set
+                            if ele == "NULL"
+                                has_null = true
+                                continue
+                            else
+                                add_map_element(first_map, root, ele)
+                            end
+                        end
+                    end
+                end
+                
+                if has_null == false
+                    all_null = false
+                    break
+                end
+            end
+
+            if all_null
+                add_map_element(first_map, root, "NULL")
+            end
+        end
+
+        if first_map != before_cal_map
+            cal_first_map()
+        end
+    end
+
+
+
+
+    function cal_follow_map()
+        
+        var before_cal_hash = follow_map
+
+        #for all non_terminal A != start-symbol do
+        foreach iter in input_res
+
+            #NULL and terminal_symbol
+            if iter.nodes.size == 1 && !is_non_terminal_symbol(iter.nodes[0].root)
+                continue
+            end
+
+            var root = iter.root
+            if root == "%start%"
+                add_map_element(follow_map, root, "%END%")
+            end
+
+            #Follow A := {}
+
+            #A ::= X1X2X3...Xn do
+            #遍历每个结点
+            #foreach Xi that is non_terminal
+            
+            for i = 0, i < iter.nodes.size, i++
+                var now_node_root = iter.nodes[i].root
+                
+                
+                #if terminal_symbol continue
+                if !is_non_terminal_symbol(now_node_root)
+                    continue
+                end
+
+                var all_null = true
+
+                #add Xi+1Xi+2...Xn
+                for j = i + 1, j < iter.nodes.size, j++
+                    var xj = iter.nodes[j].root
+                    #如果是非终结符,停止计算
+                    if !is_non_terminal_symbol(xj)
+                        #add xj - NULL to follow(xi)
+                        if xj != "NULL"
+                            add_map_element(follow_map, now_node_root, xj)
+                        end
+                        all_null = false
+                        break
+                    else
+                        var first_xj_set = first_map.at(xj)
+                        #first集元素
+                        var has_null = false
+                        #add First(xj) - ε to Follow(xi)
+                        foreach ele in first_xj_set
+                            if ele == "NULL"
+                                has_null = true
+                                continue
+                            else
+                                add_map_element(follow_map, now_node_root, ele)
+                            end
+                        end
+                        
+                        if !has_null
+                            all_null = false
+                            break
+                        end
+                        
+                        
+                    end
+                end 
+
+                # ε ∈ First(xi+1xi+2...xn)
+                if all_null
+                    if follow_map.exist(root)
+                        var root_follow_set = follow_map.at(root)
+                        foreach ele in root_follow_set
+                            add_map_element(follow_map, now_node_root, ele)
+                        end
+                    end
+                end
+                
+            end
+
+        end
+        
+        if before_cal_hash != follow_map
+            cal_follow_map()
+        end
+    end
+
+    
+    #E -> A1A2A3s -> FirstA2 - ε  -> FollowA1;  FirstA3 - ε -> FollowA2 s->FollowA3
+    #     ε  ∈ FirstA2  :  FollowA2 -  
+
+    
+    # 修改为LR0项, 将同一个statement不同位添加%MARK%标记
+    function add_mark_term(node, source_index)
+        #若仅有一个NULL(ε), 则修改为%MARK%
+        if node.nodes.size == 1 && node.nodes[0].root == "NULL"
+            var new_term = new LR_type
+            new_term.root = node.root
+            new_term.origin_nodes.push_back("NULL")
+            new_term.nodes.push_back("%MARK%")
+            new_term.source_index = source_index
+            result.push_back(new_term)
+            return ;
+        end
+
+        for i = 0, i <= node.nodes.size, i++
+            var new_term = new LR_type
+            new_term.root = node.root
+            #转移node
+            foreach iter in node.nodes do new_term.nodes.push_back(iter.root)
+            foreach iter in node.nodes do new_term.origin_nodes.push_back(iter.root)
+            #添加MARK
+            var mark = "%MARK%"
+            var iter = new_term.nodes.begin.next_n(i)
+            new_term.nodes.insert(iter, mark)
+            new_term.source_index = source_index
+            result.push_back(new_term)
+        end
+    end
+
+    #查看LR0信息
+    function show_result()
+        foreach iter in result
+            system.out.print(iter.root + " = ")
+            foreach it in iter.nodes do system.out.print(" " + it)
+            system.out.println("")
+        end
+    end
+
+    function show_node_info(node)
+        foreach iter in node.nodes do system.out.print(iter.root + " ")
+    end
+
+    function run(res, log_priv)
+
+        # recieve statement list
+        input_res = res
+
+        #log privileges
+        enable_log = log_priv
+
+        # show now info
+        if enable_log
+            system.out.println("\n\n")
+            print_header("show origin terms info")
+            foreach iter in input_res
+                system.out.print(iter.root + " ::= ")
+                show_node_info(iter)
+                system.out.println("")
+            end
+        end
+        # add unique entrance
+        add_start_term(input_res)
+        if enable_log
+            system.out.println("\n\n")
+            print_header("show info after add start node")
+            foreach iter in input_res
+                system.out.print(iter.root + " ::= ")
+                show_node_info(iter)
+                system.out.println(";")
+            end
+        end
+        # calculate first set and follow set
+
+        cal_first_map()
+
+        cal_follow_map()
+
+        # add LR(0) TERM
+        for i = 0, i < input_res.size, i++
+             add_mark_term(input_res[i], i)
+        end
+        
+    end
+end
+
+
+class target_type
+    var target_idx = -1
+    var change_value = ""
+end
+
+
+class NFA_type
+    var input_list = new array
+
+    var flat_list = new array
+
+    var result_list = new array
+
+    var enable_log = true
+    
+
+
+    function flat_trees()
+        var statement_idx = 0
+        var temp_str = ""
+
+        #需要判断项类型
+        #针对每一个项
+        foreach iter in input_list
+            var idx = 0 
+            var new_term = new LR_type
+            new_term.root = iter.root
+            new_term.source_index = iter.source_index
+            new_term.origin_nodes = iter.origin_nodes
+            
+            #只有一个%MARK%的项
+            if iter.nodes.size == 1 && iter.nodes[0] == "%MARK%"
+                
+                new_term.nodes.push_back("%MARK%")
+
+                #修改term属性
+                new_term.mark_pos = 0
+                new_term.mark_before = "%NULL%"
+                new_term.mark_after = "%NULL%"
+                new_term.idx = statement_idx
+                new_term.term_type = LR_term_type.deduce
+
+
+                flat_list.push_back(new_term)
+                statement_idx++
+                continue
+            end
+
+            #其他类型的项
+            foreach it in iter.nodes
+                
+                var str = it
+                new_term.nodes.push_back(str)
+            
+                #mark after
+                if new_term.mark_pos >= 0 && idx == new_term.mark_pos + 1
+                    new_term.mark_after = str
+                end
+
+                #找前一项 mark_before
+                if str == "%MARK%"
+                    new_term.mark_pos = idx
+                    if idx == 0
+                        new_term.mark_before = "%NULL%"
+                    else
+                        new_term.mark_before = temp_str
+                    end
+                    
+                    #最后一项
+                    if idx == iter.nodes.size - 1
+                        new_term.mark_after = "%NULL%"
+                    end
+                end
+                
+                
+                temp_str = str
+                
+                idx++
+            end
+
+            #判断term类型
+            if new_term.mark_after != "%NULL%"
+                if is_non_terminal_symbol(new_term.mark_after)
+                    new_term.term_type = LR_term_type.to_deduce
+                else
+                    new_term.term_type = LR_term_type.shift
+                end
+            else
+                if new_term.root == "%start%"
+                    new_term.term_type = LR_term_type.accept
+                else
+                    new_term.term_type = LR_term_type.deduce
+                end
+            end
+
+            new_term.idx = statement_idx
+            flat_list.push_back(new_term)
+            
+            statement_idx++
+        end
+    end
+
+    function create_NFA()
+        foreach iter in flat_list
+            var after_ele = iter.mark_after
+            foreach it in flat_list
+                if after_ele == it.root && it.mark_pos == 0
+                    var target = new target_type
+                    target.target_idx = it.idx
+                    target.change_value = "%NULL%"
+                    iter.targets.push_back(target)
+                end
+                if iter.source_index == it.source_index && iter.mark_pos + 1 == it.mark_pos
+                    var target = new target_type
+                    target.target_idx = it.idx
+                    target.change_value = it.mark_before
+                    iter.targets.push_back(target)
+                end
+            end
+        end
+    end
+
+    function show_flat_result()
+        foreach iter in flat_list
+            system.out.print(iter.root + "  :  ")
+            foreach it in iter.nodes
+                system.out.print(it + "  ")
+            end
+            system.out.println("\n index is: " + iter.idx + ", source_index: " + iter.source_index + ", before: " + iter.mark_before + ", after: " + iter.mark_after)
+        end
+    end
+
+    function run(statement_list, log_priv)
+
+        input_list = statement_list
+        flat_trees()
+
+        enable_log = log_priv
+        
+        if enable_log
+            system.out.println("\n\n")
+            print_header("DFA TERM")
+            show_flat_result()
+        end
+
+        create_NFA()
+
+        if enable_log
+            system.out.println("\n\n")
+            print_header("ADD TARGETS")
+            foreach iter in flat_list do print_LR_type(iter)
+        end
+        
+        result_list = flat_list
+    end
+end
+
+function print_LR_type(term)
+    system.out.print(term.root + "  :  ")
+    foreach it in term.nodes
+        system.out.print(it + "  ")
+    end
+
+    var type_info = ""
+    switch term.term_type
+        case LR_term_type.accept
+            type_info = "accept"
+        end
+        case LR_term_type.deduce
+            type_info = "deduce"
+        end
+        case LR_term_type.shift
+            type_info = "shift"
+        end
+        case LR_term_type.to_deduce
+            type_info = "to_deduce"
+        end
+        default
+            type_info = "wrong type"
+        end
+    end
+
+    system.out.println("\n index is: " + term.idx + ", term type: " + type_info + ", before: " + term.mark_before + ", after: " + term.mark_after)
+    
+    
+    system.out.println("TARGET LIST: ")
+    foreach iter in term.targets do system.out.println("target index: " + iter.target_idx + "  , change_value: " + iter.change_value)
+    system.out.println("")
+end
+
+
+#idx: Term序号
+#from_ele: 记录 (其实没什么用)
+#subset:   记录该项中所有LRTerm项
+#to_ele:   记录状态转移项
+struct subset_type
+    var idx = -1
+
+    var from_ele = new array
+
+    var subset = new array
+
+    var to_ele = new array
+end
+
+struct DFA_to_type
+
+    var target_idx = -1
+
+    var target_source = ""
+
+    var targets = new array
+
+end
+
+
+class DFA_type
+    var input_list = new array
+
+    var enable_log = true
+
+    var subset_list = new array
+
+    var first_map = new hash_map
+
+    var follow_map = new hash_map
+
+    var log_info = new array
+
+    var error_info = new array
+
+    var predict_table = new array
+
+    function print_table()
+        # var index= 0 
+        foreach iter in subset_list
+            # iter.idx = index
+            print_header("#" + iter.idx + "  TERM#")
+            system.out.println("\n")
+            print_header("#FROM SET#")
+            foreach it in iter.from_ele do print_LR_type(it)
+            print_header("#SUBSET#")
+            foreach it in iter.subset do print_LR_type(it)
+            print_header("#TO SET#")
+            # foreach it in iter.to_ele do print_LR_type(it)
+            foreach it in iter.to_ele
+                system.out.println("index: " + it.target_idx + ", target_source: " + it.target_source)
+                # foreach ele in it.targets do print_LR_type(ele)
+                system.out.println("")
+            end
+            system.out.println("\n")
+            # index++
+        end
+    end
+    
+    function print_simple_table()
+
+        foreach row in subset_list
+            print_header("###TERM###")
+            system.out.println("\nFrom Source")
+            foreach ele in row.from_ele do system.out.print(to_string(ele.idx) + "  ")
+            system.out.println("\nSub Set")
+            foreach ele in row.subset do system.out.print(to_string(ele.idx) + "  ")
+            system.out.println("\nTo Target")
+            foreach ele in row.to_ele do system.out.print(to_string(ele.idx) + "  ")
+            system.out.println("")
+        end
+    end
+
+    function cal_sub_set(set)
+        var add_set = new array
+
+        foreach term in set
+            foreach target in term.targets
+                if target.change_value != "%NULL%"
+                    continue
+                end
+                var new_val = true
+                var add_new_val = true
+                foreach ele in set
+                    if target.target_idx == ele.idx
+                        new_val = false
+                    end
+                end
+                if new_val
+                    foreach ele in add_set
+                        if target.target_idx == ele.idx
+                            add_new_val = false
+                        end
+                    end
+                else
+                    add_new_val = false
+                end    
+                if add_new_val
+                    add_set.push_back(input_list[target.target_idx])
+                end
+            end
+        end
+        
+        if !add_set.empty()
+            foreach iter in add_set do set.push_back(iter)
+            # print_header("#SHOW S#")
+            # foreach iter in set do system.out.print(to_string(iter.idx) + "  ")
+            # system.out.println("")
+            set = cal_sub_set(set)
+        end
+        return set
+    end
+
+    function minimal_subset(terms)
+        var subset = new subset_type
+        var set = new array
+        var to_set = new array
+        #M值
+
+        subset.from_ele = terms
+
+        foreach iter in terms do set.push_back(iter)
+
+        #统计S值
+        set = cal_sub_set(set)
+        foreach subset_term in subset_list
+            if set == subset_term.subset
+                return 
+            end
+        end
+
+        
+        subset.subset = set
+        #to_set 需要修改
+        # subset.to_ele = to_set
+        
+        #iter : from_set各元素
+        # foreach iter in terms 
+               
+        #subset各元素
+        
+        foreach it in set
+
+            foreach target in it.targets
+                if target.change_value != "%NULL%"
+                    var new_val = true
+                    foreach set_iter in to_set
+                        if target.target_idx == set_iter.idx
+                            new_val = false
+                        end
+                    end
+                    if new_val
+                        to_set.push_back(input_list[target.target_idx])
+                    end
+                end
+            end
+        end
+        # end 
+
+        
+        #统计不同的输出term
+        var target_array = new array
+
+        foreach iter in to_set
+            #检查转换符号
+            var value = iter.mark_before
+            var new_target = true
+            #若已有该转换符号的term,则添加
+            foreach it in target_array
+                if value == it[0].mark_before
+                    it.push_back(iter)
+                    new_target = false
+                    break
+                end
+            end
+            #若没有,则新建一个列
+            if !new_target
+                continue
+            else
+                var new_array = new array
+                new_array.push_back(iter)
+                target_array.push_back(new_array)
+            end
+        end
+
+
+        # if set.size == 3
+        #     print_header("especial test")
+        #     print_header("SET")
+        #     foreach iter in set do print_LR_type(iter)
+        #     print_header("TARGET SET")
+        #     foreach iter in target_array 
+        #          foreach it in iter do print_LR_type(it)
+        #     end
+        # end
+
+        var cal_targets = new array
+
+        foreach targets in target_array 
+            var target_set = new hash_set
+            var new_target = true
+            var target_source = targets[0].mark_before
+            foreach target in targets do target_set.insert(target.idx)
+            if new_target
+                var dfa_to_ele = new DFA_to_type
+                dfa_to_ele.target_source = target_source
+                dfa_to_ele.targets = targets
+                subset.to_ele.push_back(dfa_to_ele)
+                cal_targets.push_back(targets)        
+            end
+        end
+
+        subset_list.push_back(subset)
+
+        foreach targets in cal_targets 
+            minimal_subset(targets)
+        end
+        
+    end
+
+    function add_target()
+        var index = 0
+        #排序
+        foreach iter in subset_list do iter.idx = index++
+
+        foreach term in subset_list
+            foreach target in term.to_ele
+                #to_set
+                var set = cal_sub_set(target.targets)
+                var to_set = new hash_set
+                foreach ele in set do to_set.insert(ele.idx)
+                var match = false
+                foreach compare_term in subset_list
+                    #sub set
+                    var sub_set = new hash_set
+                    foreach ele in compare_term.subset do sub_set.insert(ele.idx) 
+                    
+                    if to_set == sub_set
+                        match =true
+                        target.target_idx = compare_term.idx
+                    end
+                end
+
+                if !match
+                    print_header("ERRORRRRRRRRRRRRRRR")
+                end
+            end
+        end
+    end
+
+    function check_rule()
+        var has_deduce_conflict = false
+        foreach dfa_term in subset_list
+            # system.out.println("???")
+            var deduce_array = new array
+            var shift_array = new array
+            foreach lr0_term in dfa_term.subset
+
+
+                if lr0_term.term_type == LR_term_type.shift && !is_non_terminal_symbol(lr0_term.mark_after)
+                    shift_array.push_back(lr0_term)
+                end
+                if lr0_term.term_type == LR_term_type.deduce || lr0_term.term_type == LR_term_type.accept
+                    deduce_array.push_back(lr0_term)
+                end
+            end
+
+            if deduce_array.size >= 2
+                log_info.push_back(to_string(dfa_term.idx) + "  has deduce-deduce conflict(MAY HAVE CONFILICT)")
+                for i = 0, i < deduce_array.size, i++
+                    for j = i + 1, j < deduce_array.size, j++
+                        var wrong = false
+                        if deduce_array[i].root == deduce_array[j].root && deduce_array[i].origin_nodes != deduce_array[j].origin_nodes
+                            wrong = true
+                        else
+                            var left_set = follow_map.at(deduce_array[i].root)
+                            var right_set = follow_map.at(deduce_array[j].root)
+                            #交集为空
+                            if !hash_set.intersect(left_set, right_set).empty()
+                                wrong = true
+                            end
+                        end
+                        if wrong 
+                            log_info.push_back("\t" + deduce_array[i].root + "   " + deduce_array[j].root + " deduce-deduce conflict")
+                            error_info.push_back(to_string(dfa_term.idx) + "    " + deduce_array[i].root + "   " + deduce_array[j].root + " deduce-deduce conflict")
+                            has_deduce_conflict = true
+                        else
+                            log_info.push_back("\t" + deduce_array[i].root + "   " + deduce_array[j].root + " deduce-deduce (NOT CONFLICT)")
+                        end
+                    end
+                end
+            end
+
+            if !deduce_array.empty() && !shift_array.empty()
+                log_info.push_back(to_string(dfa_term.idx) + "  has shift-deduce conflict(MAY HAVE CONFILICT)")
+
+                foreach shift_term in shift_array
+                    foreach deduce_term in deduce_array
+                        
+                        var con_symbol = shift_term.mark_after
+                        #如果有交集
+                        if follow_map.at(deduce_term.root).exist(con_symbol)
+                            log_info.push_back(shift_term.root + "   " + deduce_term.root + " shift-deduce conflict")
+                            error_info.push_back(shift_term.root + "   " + deduce_term.root + " shift-deduce conflict")
+                        else 
+                            log_info.push_back(shift_term.root + "   " + deduce_term.root + " shift-deduce(NOT CONFLICT)")
+                        end
+                    end
+                end
+            end
+        end
+
+        return has_deduce_conflict
+    end
+
+    function create_predict_table()
+        foreach iter in subset_list
+            #state
+            var index = iter.idx
+
+            var to_map = new hash_map
+            
+            foreach term in iter.subset
+                if term.term_type == LR_term_type.accept
+                    to_map.insert("%END%", -1)
+                end
+                if term.term_type == LR_term_type.deduce
+                    foreach follow_ele in follow_map.at(term.root) do to_map.insert(follow_ele, term)
+                end
+            end
+
+            #get subset.to_ele
+            foreach change_term in iter.to_ele
+                to_map.insert(change_term.target_source, change_term.target_idx)
+            end
+
+            if !to_map.empty()
+                predict_table.push_back(to_map)
+            end
+        end
+    end
+    
+    function show_predict_table()
+        var index = 0
+        #predict_table(array)
+        foreach iter in predict_table
+            system.out.println("State " + index + " : ")
+            foreach change_rule in iter
+                system.out.print("\t" + change_rule.first +  " : ")
+                if typeid change_rule.second == typeid LR_type
+                    system.out.print("" + change_rule.second.root + " ::= ")
+                    foreach node in change_rule.second.origin_nodes
+                        system.out.print(" " + node)
+                    end
+                    
+                else
+                    system.out.print(" " + change_rule.second)
+                end
+                system.out.println(";")
+            end
+            system.out.println("")
+            index++
+            
+        end
+    end
+
+    # New added
+    function print_predict_table_as_json(os, compress)
+        os.print("{")
+        var index = 0
+        #predict_table(array)
+        foreach iter in predict_table
+            os.print("\"" + index + "\":{")
+            foreach change_rule in iter
+                os.print("\"" + change_rule.first + "\":{")
+                if typeid change_rule.second == typeid LR_type
+                    os.print("\"TYP\":\"R\",")
+                    os.print("\"TGT\":\"" + change_rule.second.root + "\",")
+                    os.print("\"POP\":\"" + change_rule.second.origin_nodes.size + "\"")
+                else
+                    os.print("\"TYP\":\"S\",")
+                    os.print("\"TGT\":\"" + change_rule.second + "\"")
+                end
+                os.print("},")
+            end
+            os.seek_from(iostream.seekdir.present, -1)
+            os.print("},")
+            index++
+        end
+        os.seek_from(iostream.seekdir.present, -1)
+        os.print("}")
+    end
+    
+    function run(input, first_m, follow_m, log_priv)
+        input_list = input
+        first_map = first_m
+        follow_map = follow_m
+        enable_log = log_priv
+
+        if enable_log
+            print_header("#DFA#")
+        end
+        
+        var terms = new array
+        terms.push_back(input_list[0])
+        minimal_subset(terms)
+        
+        # print_table()
+
+        add_target()
+
+        if enable_log
+            print_table()
+        end
+
+        # print_simple_table()
+
+        var is_slr_grammar = check_rule()
+
+        return is_slr_grammar
+    end
+end
+
+
+function print_header(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+    system.out.println(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+end
+

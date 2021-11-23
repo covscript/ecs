@@ -1,0 +1,843 @@
+# Covariant Script Parser Generator v1.1.3
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Copyright (C) 2017-2021 Michael Lee(李登淳)
+#
+# Email:   lee@covariant.cn, mikecovlee@163.com
+# Github:  https://github.com/mikecovlee
+# Website: http://covscript.org.cn
+
+@require: 210503
+
+package parsergen
+
+import regex
+
+# ParserGen Syntax
+
+struct syntax_impl
+    var boot = null
+    var type = null
+    var data = null
+end
+
+namespace syntax_type
+@begin
+    constant
+        token  = 1,
+        term   = 2,
+        ref    = 3,
+        nlook  = 4,
+        repeat = 5,
+        opt    = 6,
+        cond   = 7,
+        cond_p = 8
+@end
+end
+
+function make_syntax(type, data)
+    var s = new syntax_impl
+    s.type = type
+    s.data = data
+    return move(s)
+end
+
+namespace syntax
+    function token(data)
+        return make_syntax(syntax_type.token, data)
+    end
+    function term(data)
+        return make_syntax(syntax_type.term, data)
+    end
+    function ref(name)
+        return make_syntax(syntax_type.ref, name)
+    end
+    # ?!(...), Negative Lookahead
+    function nlook(...args)
+        return make_syntax(syntax_type.nlook, args)
+    end
+    # {...}
+    function repeat(...args)
+        return make_syntax(syntax_type.repeat, args)
+    end
+    # [...]
+    function optional(...args)
+        return make_syntax(syntax_type.opt, args)
+    end
+    # a | b | c... ==> {a}, {b}, {c}...
+    function cond_or(...args)
+        var data = new array
+        foreach it in args do data.push_back(make_syntax(syntax_type.cond_p, it))
+        return make_syntax(syntax_type.cond, data)
+    end
+end
+
+# Grammar Class
+# ext: File Extension Filter described by Regular Expression
+# lex: Lexical Rules written in Regular Expression
+# stx: Syntax Rules written in ParserGen Syntax
+class grammar
+    var ext = ".*"
+    var lex = null
+    var stx = null
+end
+
+# Lexer
+
+struct token_type
+    var pos = {0, 0}
+    var type = null
+    var data = null
+end
+
+function make_token(pos, type, data)
+    var t = new token_type
+    t.pos = pos
+    if t.pos[0] > 0
+        --t.pos[0]
+    end
+    t.type = type
+    t.data = data
+    return move(t)
+end
+
+struct lex_error
+    var text = new string
+    var pos = {0, 0}
+end
+
+class lexer_type
+    var lexical_set = new hash_set
+    var error_log = new array
+    var output = new array
+    var buff = new string
+    var data = null
+    var wpos = {0, 0}
+    var pos = {0, 0, 0}
+    function cursor_forward()
+        ++pos[2]
+        if pos[2] != data.size
+            if data[pos[2]] == '\n'
+                ++pos[1]
+                pos[0] = 0
+            else
+                ++pos[0]
+            end
+        end
+    end
+    function error(str, pos)
+        var err = new lex_error
+        err.text = str
+        err.pos = pos
+        --err.pos[0]
+        error_log.push_back(move(err))
+    end
+    function process_token()
+        if lexical_set.size > 1
+            if lexical_set.exist("err")
+                error("Unexpected input \"" + buff + "\"", wpos)
+                lexical_set = new hash_set
+                return
+            else
+                if lexical_set.exist("ign")
+                    lexical_set.erase("ign")
+                end
+                if lexical_set.size > 1
+                    error("Ambiguous lexical \"" + buff + "\"", wpos)
+                    lexical_set = new hash_set
+                    return
+                end
+            end
+        end
+        var rule = null
+        foreach it in lexical_set do rule = it
+        if rule != "ign"
+            output.push_back(make_token(wpos, rule, buff))
+        end
+    end
+    function run(lexical, text)
+        data = text
+        while pos[2] != data.size
+            var ch = data[pos[2]]
+            if lexical_set.empty()
+                var nbuff = to_string(ch)
+                foreach it in lexical
+                    if !it.second.match(nbuff).empty()
+                        lexical_set.insert(it.first)
+                    end
+                end
+                if !lexical_set.empty()
+                    wpos = pos
+                    buff = nbuff
+                else
+                    error("Unknown character \'" + nbuff + "\'", pos)
+                end
+                cursor_forward()
+            else
+                var nbuff = buff + ch
+                var nset = new hash_set
+                foreach it in lexical_set
+                    if lexical[it].match(nbuff).empty()
+                        nset.insert(it)
+                    end
+                end
+                nset = hash_set.subtract(lexical_set, nset)
+                if nset.empty()
+                    process_token()
+                    lexical_set = new hash_set
+                else
+                    lexical_set = nset
+                    buff = nbuff
+                    cursor_forward()
+                end
+            end
+        end
+        process_token()
+        return output
+    end
+end
+
+# Parser
+
+struct syntax_tree
+    var root = new string
+    var nodes = new array
+end
+
+struct parse_stage
+    var product = new syntax_tree
+    var cursor = 0
+end
+
+struct parse_error
+    var cursor = 0
+    var text = new string
+    var pos = {0, 0}
+end
+
+namespace parse_state
+@begin
+    constant
+        accept =  1,
+        stop   =  2,
+        reject = -1,
+        eof    = -2
+@end
+end
+
+struct bootset_type
+    var data_set = new hash_set
+    var type_set = new hash_set
+    function predict(token)
+        return data_set.exist(token.data) || type_set.exist(token.type)
+    end
+    function empty()
+        return data_set.empty() && type_set.empty()
+    end
+    function merge(set)
+        data_set = hash_set.merge(data_set, set.data_set)
+        type_set = hash_set.merge(type_set, set.type_set)
+    end
+end
+
+class parser_type
+    # Error Reporting
+    var error_log = new array
+    var max_cursor = 0
+    # Parsing
+    var predict_cache = new hash_map
+    var ign_bootset = null
+    var stack = new array
+    var on_ign = false
+    var syn = null
+    var lex = null
+    # Logging
+    var log_indent = 0
+    var log = false
+    # Parsing Stage
+    function push_stage(root)
+        var prev_cursor = 0
+        if !stack.empty()
+            prev_cursor = stack.front.cursor
+        end
+        stack.push_front(new parse_stage)
+        link top = stack.front
+        top.product.root = root
+        top.cursor = prev_cursor
+    end
+    function pop_stage()
+        return stack.pop_front()
+    end
+    # Parsing Product
+    function push(val)
+        stack.front.product.nodes.push_back(val)
+    end
+    function push_token()
+        link top = stack.front
+        top.product.nodes.push_back(lex[top.cursor++])
+    end
+    # Token Streams
+    function cursor()
+        return stack.front.cursor
+    end
+    function eof()
+        return stack.front.cursor >= lex.size
+    end
+    function peek()
+        return lex.at(stack.front.cursor)
+    end
+    function get()
+        return lex.at(stack.front.cursor++)
+    end
+    # Error & Logs
+    function error(str, pos)
+        var err = new parse_error
+        err.cursor = stack.front.cursor
+        err.text = str
+        err.pos = pos
+        if err.cursor > max_cursor
+            max_cursor = err.cursor
+        end
+        error_log.push_back(move(err))
+    end
+    # N: Error Level
+    function get_log(n)
+        var set = new hash_set
+        var arr = new array
+        foreach it in error_log
+            if it.cursor >= max_cursor - n && !set.exist(it.text)
+                set.insert(it.text)
+                arr.push_back(it)
+            end
+        end
+        return move(arr)
+    end
+    # SS: Stack Size
+    # CP: Cursor Position
+    function parse_log(txt)
+        if log
+            @begin
+            system.out.print(
+                "SS = " + stack.size + "\t" +
+                "CP = " + stack.front.cursor + "\t"
+            )
+            @end
+            foreach i in range(log_indent) do system.out.print("  ")
+            system.out.println(txt)
+        end
+    end
+    # Parsing Methods
+    function accept()
+        link prev_stage = pop_stage()
+        push(prev_stage.product)
+        stack.front.cursor = prev_stage.cursor
+    end
+    function merge()
+        link prev_stage = pop_stage()
+        link top = stack.front
+        foreach it in prev_stage.product.nodes do top.product.nodes.push_back(move(it))
+        stack.front.cursor = prev_stage.cursor
+    end
+    function match_syntax(seq)
+        foreach it in seq
+            var result = this.match(it)
+            if result != parse_state.accept
+                return result
+            end
+        end
+        return parse_state.accept
+    end
+    function try_ignore()
+        var cur = null
+        if !on_ign && syn.exist("ignore")
+            if ign_bootset != null && stack.front.cursor < lex.size && !ign_bootset.predict(lex.at(stack.front.cursor))
+                parse_log("Predict Failed in IGNORE")
+                return null
+            end
+            on_ign = true
+            push_stage("ignore")
+            parse_log("Begin Ignore")
+            ++log_indent
+            if match_syntax(syn.ignore) == parse_state.accept
+                link prev_stage = pop_stage()
+                cur = prev_stage.cursor
+            else
+                pop_stage()
+            end
+            --log_indent
+            parse_log("End Ignore")
+            on_ign = false
+        end
+        return move(cur)
+    end
+    function ignore()
+        var cur = try_ignore()
+        if cur != null
+            stack.front.cursor = cur
+        end
+    end
+    # Match Prediction
+    function predict(set, fail_on_eof)
+        if set != null && !eof()
+            link token = peek()
+            if set.data_set.exist(token.data) || set.type_set.exist(token.type)
+                return true
+            end
+            var cur = try_ignore()
+            if cur != null && cur < lex.size
+                token := lex.at(cur)
+                if set.data_set.exist(token.data) || set.type_set.exist(token.type)
+                    return true
+                end
+            end
+            return false
+        else
+            return !fail_on_eof
+        end
+    end
+    # Match:  Terminal Symbols
+    # Deduce: Nonterminal Symbols
+    # Accept: Matching Successfully
+    # Reject: Matching Failed, Rollback
+    function match(it)
+        switch it.type
+            case syntax_type.token
+                parse_log("Match  " + it.data)
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if peek().type != it.data
+                    ignore()
+                end
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if peek().type == it.data
+                    parse_log("Accept " + it.data)
+                    push_token()
+                    return parse_state.accept
+                else
+                    parse_log("Reject " + it.data)
+                    error("Unexpected Token \'" + peek().data + "\'", peek().pos)
+                    return parse_state.reject
+                end
+            end
+            case syntax_type.term
+                parse_log("Match  " + it.data)
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if peek().data != it.data
+                    ignore()
+                end
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if peek().data == it.data
+                    parse_log("Accept " + it.data)
+                    push_token()
+                    return parse_state.accept
+                else
+                    parse_log("Reject " + it.data)
+                    error("Unexpected Token \'" + peek().data + "\'", peek().pos)
+                    return parse_state.reject
+                end
+            end
+            case syntax_type.ref
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if it.boot == null ? !predict(predict_cache.at(it.data), false) : !predict(it.boot, false)
+                    parse_log("Predict Failed: " + it.data)
+                    return parse_state.reject
+                end
+                push_stage(it.data)
+                parse_log("Deduce " + it.data)
+                ++log_indent
+                var result = match_syntax(syn.at(it.data))
+                --log_indent
+                if result == parse_state.reject
+                    parse_log("Reject " + it.data)
+                    pop_stage()
+                    return parse_state.reject
+                else
+                    parse_log("Accept " + it.data)
+                    accept()
+                    if result != parse_state.eof
+                        return parse_state.accept
+                    else
+                        return parse_state.eof
+                    end
+                end
+            end
+            case syntax_type.nlook
+                if predict(it.boot, true)
+                    parse_log("Predict Failed in NLOOK")
+                    return parse_state.stop
+                end
+                push_stage("nlook")
+                var result = match_syntax(it.data)
+                pop_stage()
+                switch result
+                    case parse_state.accept
+                        return parse_state.stop
+                    end
+                    case parse_state.stop
+                        return parse_state.stop
+                    end
+                    case parse_state.reject
+                        return parse_state.accept
+                    end
+                    case parse_state.eof
+                        return parse_state.eof
+                    end
+                end
+            end
+            case syntax_type.repeat
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if !predict(it.boot, false)
+                    parse_log("Predict Failed in REPEAT")
+                    return parse_state.accept
+                end
+                loop
+                    push_stage("repeat")
+                    var result = match_syntax(it.data)
+                    switch result
+                        case parse_state.accept
+                            merge()
+                        end
+                        case parse_state.stop
+                            merge()
+                            return parse_state.accept
+                        end
+                        case parse_state.reject
+                            pop_stage()
+                            return parse_state.accept
+                        end
+                        case parse_state.eof
+                            merge()
+                            return parse_state.eof
+                        end
+                    end
+                end
+            end
+            case syntax_type.opt
+                if eof()
+                    parse_log("End Of File")
+                    return parse_state.eof
+                end
+                if !predict(it.boot, false)
+                    parse_log("Predict Failed in OPTIONAL")
+                    return parse_state.accept
+                end
+                push_stage("optional")
+                var result = match_syntax(it.data)
+                if result != parse_state.reject
+                    merge()
+                else
+                    pop_stage()
+                end
+                if result != parse_state.eof
+                    return parse_state.accept
+                else
+                    return parse_state.eof
+                end
+            end
+            case syntax_type.cond
+                foreach seq in it.data
+                    if !predict(seq.boot, false)
+                        parse_log("Predict Failed in CONDITION")
+                        continue
+                    end
+                    push_stage("cond_or")
+                    var result = match_syntax(seq.data)
+                    switch result
+                        case parse_state.accept
+                            merge()
+                            return parse_state.accept
+                        end
+                        case parse_state.stop
+                            merge()
+                            return parse_state.accept
+                        end
+                        case parse_state.reject
+                            pop_stage()
+                        end
+                        case parse_state.eof
+                            merge()
+                            return parse_state.eof
+                        end
+                    end
+                end
+                error("No matching syntax", peek().pos)
+                return parse_state.reject
+            end
+        end
+        return parse_state.reject
+    end
+    # Preparation(Generating boot set of parsing stages)
+    function prep_syntax(seq)
+        var set = new bootset_type
+
+        foreach it in seq
+            switch it.type
+                case syntax_type.term
+                    set.data_set.insert(it.data)
+                    break
+                end
+                case syntax_type.token
+                    set.type_set.insert(it.data)
+                    break
+                end
+                case syntax_type.ref
+                    if it.boot != null
+                        set.merge(it.boot)
+                        break
+                    end
+                    if predict_cache.exist(it.data)
+                        it.boot := predict_cache.at(it.data)
+                        set.merge(it.boot)
+                        break
+                    end
+                    # Avoid Immediate Left Recursion
+                    if stack.empty() || stack.front != it.data
+                        stack.push_front(it.data)
+                        var ret = prep_syntax(syn.at(it.data))
+                        if !ret.empty()
+                            predict_cache.insert(it.data, ret)
+                            it.boot := ret
+                            set.merge(ret)
+                        end
+                        stack.pop_front()
+                    end
+                    break
+                end
+                case syntax_type.nlook
+                    if it.boot == null
+                        var ret = prep_syntax(it.data)
+                        if !ret.empty()
+                            it.boot := ret
+                        end
+                    end
+                end
+                case syntax_type.repeat
+                    if it.boot != null
+                        set.merge(it.boot)
+                    else
+                        var ret = prep_syntax(it.data)
+                        if !ret.empty()
+                            it.boot := ret
+                            set.merge(ret)
+                        end
+                    end
+                end
+                case syntax_type.opt
+                    if it.boot != null
+                        set.merge(it.boot)
+                    else
+                        var ret = prep_syntax(it.data)
+                        if !ret.empty()
+                            it.boot := ret
+                            set.merge(ret)
+                        end
+                    end
+                end
+                case syntax_type.cond
+                    foreach cond_p in it.data
+                        if cond_p.boot != null
+                            set.merge(cond_p.boot)
+                        else
+                            var ret = prep_syntax(cond_p.data)
+                            if !ret.empty()
+                                cond_p.boot := ret
+                                set.merge(ret)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return move(set)
+    end
+    function run(grammar, lex_output)
+        syn = grammar
+        lex = lex_output
+        
+        foreach it in syn
+            predict_cache.insert(it.first, prep_syntax(it.second))
+        end
+        if predict_cache.exist("ignore")
+            ign_bootset := predict_cache.ignore
+        end
+        prep_syntax(syn.begin)
+        push_stage("begin")
+        return match_syntax(syn.begin) == parse_state.eof && stack.size == 1
+    end
+end
+
+# Wrapped Methods
+
+function print_header(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+    system.out.println(txt)
+    foreach i in range(txt.size) do system.out.print('#')
+    system.out.println("")
+end
+
+function print_error(file, code, err)
+    foreach it in err
+        system.out.print("File \"" + file + "\", line " + (it.pos[1] + 1) + ": ")
+        system.out.println(it.text)
+        system.out.println("> " + code[it.pos[1]])
+        foreach i in range(it.pos[0] + 2) do system.out.print(' ')
+        system.out.print("^")
+        system.out.println("\n")
+    end
+end
+
+function print_ast_impl(indent, tree)
+    if tree == null
+        return
+    end
+    system.out.println(tree.root)
+    foreach it in tree.nodes
+        foreach i in range(indent + 2) do system.out.print(' ')
+        system.out.print(tree.root + " -> ")
+        if typeid it == typeid syntax_tree
+            print_ast_impl(indent + 2, it)
+        end
+        if typeid it == typeid token_type
+            system.out.println("\"" + it.data + "\"")
+        end
+    end
+end
+
+function print_ast(tree)
+    print_ast_impl(0, tree)
+end
+
+class generator
+    # Grammars
+    var rules = new hash_map
+    # String Input
+    var input = new string
+    # Line Separated Input(for Error Reporting)
+    var code_buff = new array
+    # Lexer Output
+    var token_buff = null
+    # Parser Output
+    var ast = null
+    # Workers
+    var lexer = null
+    var parser = null
+    # Options
+    var stop_on_error = false
+    var enable_log = true
+    # Private Methods
+    var file_path = "<FILE>"
+    function priv_run(lang)
+        if rules.exist(lang)
+            lexer = new lexer_type
+            if enable_log
+                print_header("Begin Lexical Analysis...")
+            end
+            if rules[lang].lex == null
+                print_header("Lexical rules not found! Stop")
+                return
+            end
+            token_buff = lexer.run(rules[lang].lex, input)
+            if !lexer.error_log.empty()
+                if stop_on_error
+                    print_header("Compilation Error")
+                else
+                    print_header("Compilation Warning")
+                end
+                print_error(file_path, code_buff, lexer.error_log)
+                if stop_on_error
+                    return
+                end
+            end
+            parser = new parser_type
+            parser.log = enable_log
+            if enable_log
+                print_header("Lexer Output")
+                var max_align = to_string(token_buff.size).size
+                foreach i in range(token_buff.size)
+                    link it = token_buff[i]
+                    var align = max_align - to_string(i).size
+                    system.out.print("CP = " + i)
+                    foreach x in range(align) do system.out.print(' ')
+                    system.out.println("  Type = " + it.type + "\tData = " + it.data + "\tPos = (" + it.pos[0] + ", " + it.pos[1] + ")")
+                end
+                print_header("Begin Syntactic Analysis...")
+            end
+            if rules[lang].stx == null
+                print_header("Syntactic rules not found! Stop")
+                return
+            end
+            if parser.run(rules[lang].stx, token_buff)
+                ast = parser.stack.front.product
+            else
+                print_header("Compilation Error")
+                var err = {(lexer.error_log)..., (parser.get_log(0))...}
+                err.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
+                print_error(file_path, code_buff, err)
+            end
+        end
+    end
+    # Public Methods
+    function add_grammar(lang, gram)
+        rules[lang] = gram
+    end
+    function from_file(path)
+        var ifs = iostream.ifstream(path)
+        if !ifs.good()
+            return
+        end
+        file_path = path
+        input = new string
+        code_buff = new array
+        while ifs.good()
+            var line = ifs.getline()
+            input += line + "\n"
+            for i = 0, i < line.size, ++i
+                if line[i] == '\t'
+                    line.assign(i, ' ')
+                end
+            end
+            code_buff.push_back(line)
+        end
+        foreach it in rules
+            var reg = regex.build(it.second.ext)
+            if !reg.match(path).empty()
+                priv_run(it.first)
+                return
+            end
+        end
+    end
+    function from_string(lang, str)
+        input = str
+        code_buff = input.split({'\n'})
+        priv_run(lang)
+    end
+end
