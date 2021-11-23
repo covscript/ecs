@@ -1,7 +1,7 @@
-import check_LR_grammar
+import slr_inspector
 import parsergen
 
-package parse_new_grammar
+package slr_parser
 
 function print_header(txt)
     foreach i in range(txt.size) do system.out.print('#')
@@ -211,7 +211,7 @@ class slr_parser_type
 
 
             #移项
-            if typeid res != typeid check_LR_grammar.LR_type
+            if typeid res != typeid slr_inspector.LR_type
                 # system.out.println("res is : " + res)
                 if res == -1
                     system.out.print("END OF PARSING")
@@ -261,7 +261,7 @@ class slr_parser_type
                 
                 var now_state = parsing_stack.back
                 #规约后到达新的状态
-                if predict_table[now_state].exist(res.root) && typeid predict_table[now_state].at(res.root) != typeid check_LR_grammar.LR_type
+                if predict_table[now_state].exist(res.root) && typeid predict_table[now_state].at(res.root) != typeid slr_inspector.LR_type
                     parsing_stack.push_back(res.root)
                     parsing_stack.push_back(predict_table[now_state].at(res.root))
                     

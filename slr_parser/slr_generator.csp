@@ -1,6 +1,6 @@
-package tree_compress
+package slr_generator
 
-import parse_new_grammar
+import slr_parser
 
 class compress_tree
     var tree = "";

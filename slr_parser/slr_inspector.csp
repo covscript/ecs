@@ -909,7 +909,7 @@ class DFA_type
     end
 
     # New added
-    function print_predict_table_as_json(os, compress)
+    function print_predict_table_as_json(os)
         os.print("{")
         var index = 0
         #predict_table(array)
@@ -920,10 +920,13 @@ class DFA_type
                 if typeid change_rule.second == typeid LR_type
                     os.print("\"TYP\":\"R\",")
                     os.print("\"TGT\":\"" + change_rule.second.root + "\",")
-                    os.print("\"POP\":\"" + change_rule.second.origin_nodes.size + "\"")
+                    os.print("\"NODE\":[")
+                    foreach node in change_rule.second.origin_nodes do os.print("\"" + node + "\",")
+                    os.seek_from(iostream.seekdir.present, -1)
+                    os.print("]")
                 else
                     os.print("\"TYP\":\"S\",")
-                    os.print("\"TGT\":\"" + change_rule.second + "\"")
+                    os.print("\"TGT\":" + change_rule.second + "")
                 end
                 os.print("},")
             end
