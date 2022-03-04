@@ -33,17 +33,23 @@ end
 
 #to judge whether a node is non_terminal or not
 function is_non_terminal_symbol(str)
+    
+    
+
     foreach iter in str
-        if iter == '\"'
+        #第一位为符号位则是终结符
+        if iter.isalpha()
             return false
+        else
+            #第一位为大写则为终结符
+            if iter.isupper()
+                return false
+            end
         end
-        if iter == '\''
-            return false
-        end
-        if iter.isupper()
-            return false
-        end 
+        break
     end
+    
+    
 
     return true
 end
