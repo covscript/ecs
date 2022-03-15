@@ -812,7 +812,7 @@ class DFA_type
                 end
 
                 if !match
-                    print_header("ERRORRRRRRRRRRRRRRR")
+                    print_header("ERROR")
                 end
             end
         end
