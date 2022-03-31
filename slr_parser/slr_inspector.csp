@@ -37,12 +37,12 @@ function is_non_terminal_symbol(str)
     
     #第一位为符号位则是终结符
     if !first_char.isalpha()
-        system.out.println(str + " is terminal1")
+        # system.out.println(str + " is terminal1")
         return false
     else
         #第一位为大写则为终结符
         if first_char.isupper()
-            system.out.println(str + " is terminal2")
+            # system.out.println(str + " is terminal2")
             return false
         end
     end
@@ -51,16 +51,16 @@ function is_non_terminal_symbol(str)
 
     #若最后一位是'_'则为非终结符(stmt_)
     if last_char=='_'
-        system.out.println(str + " is nonterminal3")
+        # system.out.println(str + " is nonterminal3")
         return true
     end
 
     if last_char.isdigit()
-        system.out.println(str + " is nonterminal4")
+        # system.out.println(str + " is nonterminal4")
         return true
     end
     
-    system.out.println(str + " is terminal5")
+    # system.out.println(str + " is terminal5")
     return false
 end
 

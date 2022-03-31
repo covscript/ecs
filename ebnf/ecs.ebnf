@@ -42,7 +42,7 @@ using_stmt_ ::= 'using' using_list_ endline;
 
 using_list_ ::= module_list_ [',' using_list_];
 
-if_stmt_ ::= 'if' basic_expr_ ENDL stmts_ {else_stmt_ stmts_ 'end' ENDL};
+if_stmt_ ::= 'if' basic_expr_ ENDL stmts_ {else_stmt_ stmts_} 'end' ENDL;
 
 else_stmt_ ::= 'else' ['if' basic_expr_] ENDL ;
 
@@ -68,7 +68,7 @@ for_body_ ::= ('do' basic_expr_ endline_ | ENDL stmts_ 'end' ENDL);
 
 function_stmt_ ::= 'function' ID '(' [argument_list_] ')' ['override'] function_body_;
 
-function_body_ ::= ('{' stmts_ '}' | ENDL stmts_ 'end' ENDL);
+function_body_ ::= ( [ENDL] '{'[ENDL] stmts_ '}' | ENDL stmts_ 'end' ENDL);
 
 return_stmt_ ::= 'return' [expr_] endline_;
 
@@ -98,7 +98,7 @@ lambda_expr_ ::= '[' [capture_list_] ']' '(' [argument_list_] ')' lambda_body_;
 
 capture_list_ ::= ['='] ID {',' capture_list_} ;
 
-argument_list_ ::= '...' ID | ['='] ID [':'] visit_expr_ {',' argument_list_};
+argument_list_ ::= '...' ID | ['='] ID [':' visit_expr_] {',' argument_list_};
 
 lambda_body_ ::= '{' {statement_ {ENDL}} '}' | '->' cond_expr_;
 
