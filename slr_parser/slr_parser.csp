@@ -167,9 +167,9 @@ class slr_parser_type
 
             
             #软关键字
-            system.out.println("predict_table[" + state + "].exist(" + dat.type + ")")
+            # system.out.println("predict_table[" + state + "].exist(" + dat.type + ")")
             if predict_table[state].exist(dat.type)
-                system.out.println("exist type  " + dat.type )
+                # system.out.println("exist type  " + dat.type )
                 tree_node.root = dat.type
                 var data_node = new tree_type
                 
@@ -177,18 +177,18 @@ class slr_parser_type
                 tree_node.nodes.push_back(data_node)
             end
 
-            system.out.println("predict_table[" + state + "].exist(" + dat.data + ")")
+            # system.out.println("predict_table[" + state + "].exist(" + dat.data + ")")
             if predict_table[state].exist(dat.data)
                 tree_node.root = ""
                 tree_node.nodes.clear()
-                system.out.println("exist data  " + dat.data)
+                # system.out.println("exist data  " + dat.data)
                 tree_node.root = dat.data
             end
 
-            system.out.println("tree_node.root is: " + tree_node.root)
+            # system.out.println("tree_node.root is: " + tree_node.root)
 
             if tree_node.root == "" && dat.type == "ENDL"
-                system.out.println("extra endl")
+                # system.out.println("extra endl")
                 data_stack.pop_back()
                 continue
             end
@@ -234,8 +234,8 @@ class slr_parser_type
 
             # system.out.println("push dat: " + tree_node.root)
 
-            system.out.println("push datA: " + tree_node.root)
-            system.out.println("res is : " + res)
+            # system.out.println("push datA: " + tree_node.root)
+            # system.out.println("res is : " + res)
 
             #移项
             if typeid res != typeid slr_inspector.LR_type
@@ -257,12 +257,12 @@ class slr_parser_type
                 store_data_stack = data_stack
                 error_level = 0
                 #储存现场
-                system.out.print("shift res ")
+                # system.out.print("shift res ")
 
                 # system.out.println("push 3")
                 tree_stack.push_back(tree_node)
                 # system.out.println("push 4")
-                system.out.println("tree stack push node " + tree_node.root)
+                # system.out.println("tree stack push node " + tree_node.root)
             else
             #规约
                 system.out.println("reduce part")
@@ -271,50 +271,50 @@ class slr_parser_type
 
                 var vec = new array 
                 if res.origin_nodes.size == 1 && res.origin_nodes[0] == "NULL"
-                    system.out.println("if1")
+                    # system.out.println("if1")
                     var tree_node = new tree_type
                     tree_node.root = "NULL"
                     vec.push_back(tree_node)
                 else
                     #消除指定长度项
-                    system.out.println("if2")
+                    # system.out.println("if2")
                     var del_time = res.origin_nodes.size
-                    system.out.println("del_time is : " +  del_time)
+                    # system.out.println("del_time is : " +  del_time)
                     #reduce
                     for i = 0, i < del_time, i++
-                        system.out.println("parsing stack pop1 ")
+                        # system.out.println("parsing stack pop1 ")
                         #pop state
                         parsing_stack.pop_back()
                         #pop data
-                        system.out.println("parsing stack pop2 ")
+                        # system.out.println("parsing stack pop2 ")
                         parsing_stack.pop_back()
 
-                        system.out.println("tree stack pop ")
+                        # system.out.println("tree stack pop ")
                         var node = tree_stack.pop_back()
 
-                        system.out.println("vec push " + node.root)
+                        # system.out.println("vec push " + node.root)
                         vec.push_front(node)
                     end
                 end
-                system.out.println("reduce part1")
+                # system.out.println("reduce part1")
                 foreach node in vec do root_node.nodes.push_back(node)    
                 
                 var now_state = parsing_stack.back
                 #规约后到达新的状态
-                system.out.println("now_state is : " + now_state)
+                # system.out.println("now_state is : " + now_state)
 
                 if predict_table[now_state].exist(res.root) && typeid predict_table[now_state].at(res.root) != typeid slr_inspector.LR_type
-                    system.out.println("res.root: " + res.root)
+                    # system.out.println("res.root: " + res.root)
                     parsing_stack.push_back(res.root)
-                    system.out.println("predict_table[now_state].at(res.root): " + predict_table[now_state].at(res.root))
+                    # system.out.println("predict_table[now_state].at(res.root): " + predict_table[now_state].at(res.root))
                     parsing_stack.push_back(predict_table[now_state].at(res.root))
 
-                    system.out.println("root_node: " + root_node)
+                    # system.out.println("root_node: " + root_node)
                     tree_stack.push_back(root_node)
-                    system.out.println("tree stack push node " + root_node.root)
+                    # system.out.println("tree stack push node " + root_node.root)
                 else
                 #恢复现场
-                system.out.println("reduce part2")
+                # system.out.println("reduce part2")
                 parsing_stack = store_parsing_stack
                 data_stack = store_data_stack
                 # system.out.println("recover from shift")
@@ -329,7 +329,7 @@ class slr_parser_type
                         recover_info.push_back(iter)
                     end
                 end
-                system.out.println("reduce part3")
+                # system.out.println("reduce part3")
                 var recover_data = recover_info.pop_back()
                 var new_data = data_stack.pop_back()
                 # if recover_data.first[0] == '\''
@@ -338,7 +338,7 @@ class slr_parser_type
                 #     new_data.type = recover_data.first[0]
                 #     new_data.data = "error"
                 # end
-                system.out.println("reduce part4")
+                # system.out.println("reduce part4")
                 continue
                     
                 end

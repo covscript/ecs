@@ -10,3 +10,7 @@ else if a > 1
 else 
     a++
 end
+
+namespace xxxx
+    using abc,efg
+end

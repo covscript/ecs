@@ -38,7 +38,7 @@ block_stmt_ ::= 'block' ENDL stmts_ 'end' ENDL;
 
 namespace_stmt_ ::= 'namespace' ID ENDL decl_stmts_ 'end' ENDL;
 
-using_stmt_ ::= 'using' using_list_ endline;
+using_stmt_ ::= 'using' using_list_ endline_;
 
 using_list_ ::= module_list_ [',' using_list_];
 
@@ -106,11 +106,11 @@ cond_expr_ ::= logic_or_expr_ [cond_postfix_];
 
 cond_postfix_ ::= '?' logic_or_expr_ ':' cond_expr_ | ':' logic_or_expr_;
 
-logic_or_expr_ ::= logic_and_expr_ [('||' | 'or') logic_or_expr_];
+logic_or_expr_ ::= logic_and_expr_ [('||' | 'or' ) logic_or_expr_];
 
 logic_and_expr_ ::= equal_expr_ [('&&' | 'and') logic_and_expr_];
 
-equal_expr_ ::= relat_expr_ [('==' | '!=') equal_expr_];
+equal_expr_ ::= relat_expr_ [('==' | '!=' | 'is' | 'not') equal_expr_];
 
 relat_expr_ ::= add_expr_ [('>' | '<' | '>=' | '<=') relat_expr_];
 
@@ -120,7 +120,7 @@ mul_expr_ ::= unary_expr_ [('*' | '/' | '%' | '^') mul_expr_];
 
 unary_expr_ ::= unary_op_ unary_expr_ | ('new' | 'gcnew') unary_expr_ [array_] | prim_expr_ [postfix_expr_];
 
-unary_op_ ::= 'typeid' | '++' | '--' | '*' | '&' | '-' | '!';
+unary_op_ ::= 'typeid' | '++' | '--' | '*' | '&' | '-' | '!' | 'not';
 
 postfix_expr_ ::= ('++' | '--' | '...')  [postfix_expr_];
 
