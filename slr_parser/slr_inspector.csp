@@ -33,19 +33,35 @@ end
 
 #to judge whether a node is non_terminal or not
 function is_non_terminal_symbol(str)
-    foreach iter in str
-        if iter == '\"'
+    var first_char = str[0]
+    
+    #第一位为符号位则是终结符
+    if !first_char.isalpha()
+        # system.out.println(str + " is terminal1")
+        return false
+    else
+        #第一位为大写则为终结符
+        if first_char.isupper()
+            # system.out.println(str + " is terminal2")
             return false
         end
-        if iter == '\''
-            return false
-        end
-        if iter.isupper()
-            return false
-        end 
     end
 
-    return true
+    var last_char = str[str.size-1]
+
+    #若最后一位是'_'则为非终结符(stmt_)
+    if last_char=='_'
+        # system.out.println(str + " is nonterminal3")
+        return true
+    end
+
+    if last_char.isdigit()
+        # system.out.println(str + " is nonterminal4")
+        return true
+    end
+    
+    # system.out.println(str + " is terminal5")
+    return false
 end
 
 
@@ -166,6 +182,14 @@ class LR_term
         end
     end
 
+    function show_first_map()
+        system.out.println("show   first_map")
+        foreach iter in first_map
+            system.out.println(iter.first + ":")
+            foreach sec in iter.second do system.out.print(sec+ " ")
+            system.out.println("")
+        end
+    end
 
 
 
@@ -334,6 +358,8 @@ class LR_term
         # calculate first set and follow set
 
         cal_first_map()
+
+        show_first_map()
 
         cal_follow_map()
 
@@ -786,7 +812,7 @@ class DFA_type
                 end
 
                 if !match
-                    print_header("ERRORRRRRRRRRRRRRRR")
+                    print_header("ERROR")
                 end
             end
         end

@@ -1,9 +1,9 @@
+import parsergen,
+        codec.json,
+        covscript.*, 
+        covscript.abc, 
+        network.tcp.x as tcp_socket
 # ECS Lang (Extended Covariant Script)
-import parsergen,  
-       codec.json,
-       covscript.*, 
-       covscript.abc, 
-       network.tcp.x as tcp_socket
 
 var a = new tcp_socket.get_type(){"192.168.233.233", 3306}, b = gcnew array
 
@@ -40,14 +40,15 @@ test([b, =c](ttx : number, =xxx){
     end
 })
 
-function test(a : string, b : number, =c)
-{
+function test(a : string, b : number, =c){
     return fuck_you()
 }
 
 struct xxxx
     var a = 10
 end
+
+a&&b
 
 foreach it in lexical_set do rule = it
 
@@ -56,7 +57,7 @@ a = "Hello" : "world"
 b = [](...xxx)->xxx > 1 ? self(xxx - 2) + self(xxx - 1) : 1
 
 namespace xxx
-    using json, tcp_socket
+    using json, tcp_socket;
     namespace xxx
         var a = 10
     end
@@ -75,3 +76,5 @@ catch e:db.index_range_error
 catch e
     throw
 end
+
+

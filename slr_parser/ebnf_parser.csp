@@ -420,7 +420,9 @@ class parser
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "slit")
                 matched = true
                 # Visit slit token
-                return nodes[idx++].data
+                var dat = nodes[idx++].data
+                dat = dat.substr(1, dat.size-2)
+                return dat
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "dlit")
                 matched = true

@@ -2,9 +2,17 @@ package slr_generator
 
 import slr_parser
 
+
+function test() 
+    system.out.println("test")
+end
+
 class compress_tree
     var tree = "";
 
+    function test1() 
+        system.out.println("test")
+    end
 
     function show_trees(node, depth)
         foreach i in range(depth) do system.out.print("\t")
@@ -35,6 +43,7 @@ class compress_tree
         tree = treenode
         show_trees(tree, 0)
         compress_tree(tree)
+        system.out.println("##########COMPRESSED TREE#########")
         show_trees(tree, 0)
     end
 
