@@ -421,7 +421,7 @@ class parser
                 matched = true
                 # Visit slit token
                 var dat = nodes[idx++].data
-                dat = dat.substr(1, dat.size-2)
+                # dat = dat.substr(1, dat.size-2)
                 return dat
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "dlit")

@@ -6,7 +6,7 @@ constant syntax = parsergen.syntax
 
 @begin
 var ebnf_lexical = {
-    "id" : regex.build("^[a-z_]*$"),
+    "id" : regex.build("^[a-z](\\w|-)*$"),
     "token" : regex.build("^[A-Z]*$"),
     "brac" : regex.build("^(\\(|\\)|\\[|\\]|\\{|\\})$"),
     "sig" : regex.build("^(:|::|(::)?=||\\||;)$"),
