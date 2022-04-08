@@ -150,21 +150,13 @@ class slr_parser_type
             var dat = data_stack.back
             #获取两个栈的栈顶信息
 
-            #遗留问题需要修改
-            #判断是否到达结束
-
-
-            #####暂时删除
-            # if dat.data != "%END%"
-            #     dat.data = "\'" + dat.data + "\'"
-            # end
-            #####  
-
-            system.out.println("state: " + state + ",  type: " + dat.type + " ,data:  " + dat.data)
+ 
+            if enable_log
+                system.out.println("state: " + state + ",  type: " + dat.type + " ,data:  " + dat.data)
+            end
             #展示state信息
             
             var tree_node = new tree_type
-
             
             #软关键字
             # system.out.println("predict_table[" + state + "].exist(" + dat.type + ")")
@@ -241,7 +233,9 @@ class slr_parser_type
             if typeid res != typeid slr_inspector.LR_type
                 
                 if res == -1
-                    system.out.print("END OF PARSING")
+                    if enable_log
+                        system.out.print("END OF PARSING")
+                    end
                     break
                 end
 
@@ -260,12 +254,13 @@ class slr_parser_type
                 # system.out.print("shift res ")
 
                 # system.out.println("push 3")
-                tree_stack.push_back(tree_node)
+                tree_stack.push_back(dat)
+                # system.out.println("tree_node : " + tree_node.root)
                 # system.out.println("push 4")
                 # system.out.println("tree stack push node " + tree_node.root)
             else
             #规约
-                system.out.println("reduce part")
+                # system.out.println("reduce part")
                 var root_node = new tree_type
                 root_node.root = res.root
 
@@ -297,8 +292,11 @@ class slr_parser_type
                     end
                 end
                 # system.out.println("reduce part1")
-                foreach node in vec do root_node.nodes.push_back(node)    
-                
+                foreach node in vec 
+                    # system.out.println("node is :" + node.root)
+                    root_node.nodes.push_back(node)    
+
+                end
                 var now_state = parsing_stack.back
                 #规约后到达新的状态
                 # system.out.println("now_state is : " + now_state)
@@ -309,7 +307,7 @@ class slr_parser_type
                     # system.out.println("predict_table[now_state].at(res.root): " + predict_table[now_state].at(res.root))
                     parsing_stack.push_back(predict_table[now_state].at(res.root))
 
-                    # system.out.println("root_node: " + root_node)
+                    # system.out.println("root_node: " + root_node.root)
                     tree_stack.push_back(root_node)
                     # system.out.println("tree stack push node " + root_node.root)
                 else
@@ -347,11 +345,7 @@ class slr_parser_type
         # system.out.println("END PARSING")
     end
 
-    function show_trees(node, depth)
-        foreach i in range(depth) do system.out.print("\t")
-        system.out.println(node.root)
-        foreach son in node.nodes do show_trees(son, depth + 1) 
-    end
+   
 
     function show_error()
         foreach error in error_log do system.out.println(error)
@@ -365,4 +359,28 @@ class slr_parser_type
         lex_rule = input_lex_rule
         parsing_stack.push_back(0)
     end
+end
+
+function show_trees(node, depth)
+    if node == null
+        return 
+    end
+    system.out.println(node.root)
+    foreach it in node.nodes
+        foreach i in range(depth + 2) do system.out.print(' ')
+        system.out.print(node.root + "->")
+        if typeid it == typeid tree_type
+            show_trees(it, depth + 2)
+        end
+        if typeid it == typeid parsergen.token_type
+            system.out.println("\"" + it.data + "\"")
+        end
+    end
+    # foreach i in range(depth) do system.out.print("\t")
+    # if typeid node == typeid tree_type
+    #     system.out.println(node.root)
+    # else
+    #     system.out.println(node.data)
+    # end
+    # foreach son in node.nodes do show_trees(son, depth + 1) 
 end

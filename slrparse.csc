@@ -69,22 +69,26 @@ var predict_table = read_cache(context.cmd_args.at(1))
 var parser = new slr_parser.slr_parser_type
 var code = from_file(context.cmd_args.at(2))
 var tree_compress = new slr_generator.compress_tree
-parser.run(code, predict_table, covscript_lexical, true)
+parser.run(code, predict_table, covscript_lexical, false)
 parser.slr_lex()
 
 # Problem here
 parser.slr_parse()
 
-system.out.println("\n\n")
-parsergen.print_header("SHOW TREE")
-parser.show_trees(parser.tree_stack.back, 0)
+# system.out.println("\n\n")
+# parsergen.print_header("SHOW TREE")
+# slr_parser.show_trees(parser.tree_stack.back, 0)
 
-system.out.println("\n\n")
-parsergen.print_header("SHOW ERROR")
+# system.out.println("\n\n")
+# parsergen.print_header("SHOW ERROR")
 parser.show_error()
 
-system.out.println("\n\n")
-parsergen.print_header("COMPRESS TREE")
+# system.out.println("\n\n")
+# parsergen.print_header("COMPRESS TREE")
 # tree_compress.test1()
 tree_compress.run(parser.tree_stack.back)
 # slr_generator.test()
+
+# system.out.println("\n\n")
+# parsergen.print_header("SHOW COMPRESSED TREE")
+slr_parser.show_trees(tree_compress.tree, 0)

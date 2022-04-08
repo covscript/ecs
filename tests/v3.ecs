@@ -1,16 +1,6 @@
 var a = 3
+# a = a + 1 + 2 + 3
 
-if a > 5
-    system.out.println(5)
-else if a > 1
-    a--
-    if(a == 1)
-        system.out.println(a)
-    end
-else 
-    a++
-end
-
-namespace xxxx
-    using abc,efg
-end
+# function c(b, c, d)
+#     b++
+# end
