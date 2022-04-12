@@ -215,7 +215,7 @@ class parser
                 
                 # new parsergen.syntax_tree
                 var tree = new tree_type
-                var name = now_name + "@" + to_string(now_time)+ "_rep_" + (now_tree.nodes.size + 1)
+                var name = now_name + "#" + to_string(now_time)+ "-rep-" + (now_tree.nodes.size + 1)
                 tree.root = name
                 
                 # add node
@@ -237,7 +237,7 @@ class parser
                 this.visit_repeat_part(nodes[idx++].nodes)
                 
                 # old_tree -> now_tree
-                prev_tree.seq = prev_tree.seq + "_" + now_tree.seq
+                prev_tree.seq = prev_tree.seq + "-" + now_tree.seq
 
                 # recover
                 now_tree = prev_tree
@@ -252,7 +252,7 @@ class parser
 
                 # new parsergen.syntax_tree
                 var tree = new tree_type
-                var name = now_name + "@" + to_string(now_time)+ "_decl_" + (now_tree.nodes.size + 1)
+                var name = now_name + "#" + to_string(now_time)+ "-decl-" + (now_tree.nodes.size + 1)
                 tree.root = name
                 
                 # add node
@@ -274,7 +274,7 @@ class parser
                 this.visit_declaration_part(nodes[idx++].nodes)
 
                 # old_tree -> now_tree
-                prev_tree.seq = prev_tree.seq + "_" + now_tree.seq
+                prev_tree.seq = prev_tree.seq + "-" + now_tree.seq
 
                 # recover
                 now_tree = prev_tree
@@ -287,7 +287,7 @@ class parser
                 
                 # new parsergen.syntax_tree
                 var tree = new tree_type
-                var name = now_name + "@" + to_string(now_time) + "_opt_" + (now_tree.nodes.size + 1)
+                var name = now_name + "#" + to_string(now_time) + "-opt-" + (now_tree.nodes.size + 1)
                 tree.root = name
                 
                 # add node
@@ -309,7 +309,7 @@ class parser
                 this.visit_alternative_part(nodes[idx++].nodes)
                 
                 # old_tree -> now_tree
-                prev_tree.seq = prev_tree.seq + "_" + now_tree.seq
+                prev_tree.seq = prev_tree.seq + "-" + now_tree.seq
 
                 # recover
                 now_tree = prev_tree
@@ -421,7 +421,7 @@ class parser
                 matched = true
                 # Visit slit token
                 var dat = nodes[idx++].data
-                dat = dat.substr(1, dat.size-2)
+                # dat = dat.substr(1, dat.size-2)
                 return dat
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "dlit")

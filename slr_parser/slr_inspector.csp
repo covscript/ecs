@@ -32,37 +32,55 @@ end
 
 
 #to judge whether a node is non_terminal or not
-function is_non_terminal_symbol(str)
-    var first_char = str[0]
+# function is_non_terminal_symbol(str)
+#     var first_char = str[0]
     
-    #第一位为符号位则是终结符
-    if !first_char.isalpha()
-        # system.out.println(str + " is terminal1")
-        return false
-    else
-        #第一位为大写则为终结符
-        if first_char.isupper()
-            # system.out.println(str + " is terminal2")
+#     #第一位为符号位则是终结符
+#     if !first_char.isalpha()
+#         # system.out.println(str + " is terminal1")
+#         return false
+#     else
+#         #第一位为大写则为终结符
+#         if first_char.isupper()
+#             # system.out.println(str + " is terminal2")
+#             return false
+#         end
+#     end
+
+#     var last_char = str[str.size-1]
+
+#     #若最后一位是'_'则为非终结符(stmt_)
+#     if last_char=='_'
+#         # system.out.println(str + " is nonterminal3")
+#         return true
+#     end
+
+#     if last_char.isdigit()
+#         # system.out.println(str + " is nonterminal4")
+#         return true
+#     end
+    
+#     # system.out.println(str + " is terminal5")
+#     return false
+# end
+
+function is_non_terminal_symbol(str)
+
+    foreach iter in str
+        if iter == '\"'
             return false
         end
+        if iter == '\''
+            return false
+        end
+        if iter.isupper()
+            return false
+        end 
     end
 
-    var last_char = str[str.size-1]
-
-    #若最后一位是'_'则为非终结符(stmt_)
-    if last_char=='_'
-        # system.out.println(str + " is nonterminal3")
-        return true
-    end
-
-    if last_char.isdigit()
-        # system.out.println(str + " is nonterminal4")
-        return true
-    end
-    
-    # system.out.println(str + " is terminal5")
-    return false
+    return true
 end
+
 
 
 class LR_term
@@ -942,12 +960,21 @@ class DFA_type
         foreach iter in predict_table
             os.print("\"" + index + "\":{")
             foreach change_rule in iter
+                if change_rule.first[0] == '\''
+                    change_rule.first = change_rule.first.substr(1, change_rule.first.size-2)
+                end
                 os.print("\"" + change_rule.first + "\":{")
                 if typeid change_rule.second == typeid LR_type
                     os.print("\"TYP\":\"R\",")
                     os.print("\"TGT\":\"" + change_rule.second.root + "\",")
                     os.print("\"NODE\":[")
-                    foreach node in change_rule.second.origin_nodes do os.print("\"" + node + "\",")
+                    foreach node in change_rule.second.origin_nodes
+                        if node[0] == '\''
+                            node = node.substr(1, node.size-2)
+                        end
+                        os.print("\"" + node + "\",")
+                    end
+                    # foreach node in change_rule.second.origin_nodes do os.print("\"" + node + "\",")
                     os.seek_from(iostream.seekdir.present, -1)
                     os.print("]")
                 else

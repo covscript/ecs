@@ -1,3 +1,6 @@
 .ecs_output/
 slr_cache.json
 print.txt
+parse_out.txt
+error.txt
+slr_cache.json.*

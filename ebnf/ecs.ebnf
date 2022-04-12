@@ -1,141 +1,141 @@
-begin_ ::= stmts_ ;
+begin ::= stmts ;
 
-ignore_ ::= { ENDL } ;
+ignore ::= { ENDL } ;
 
-endline_ ::= ENDL | ';' ;
+endline ::= ENDL | ';' ;
 
-stmts_ ::= {statement_ {ENDL}} ;
+stmts ::= {statement {ENDL}} ;
 
-decl_stmts_ ::= {declaration_ {ENDL}} ;
+decl-stmts ::= {declaration {ENDL}} ;
 
-endblock_ ::= end_stmt_ | else_stmt_ | until_stmt_ | catch_stmt_ ;
+endblock ::= end-stmt | else-stmt | until-stmt | catch-stmt ;
 
-statement_ ::= prep_stmt_ | package_stmt_ | import_stmt_ | var_stmt_ | block_stmt_ | namespace_stmt_ | using_stmt_ | if_stmt_ | switch_stmt_ | while_stmt_ | loop_stmt_ | for_stmt_ | foreach_stmt_ | control_stmt_ | function_stmt_ | return_stmt_ | try_stmt_ | throw_stmt_ | class_stmt_ | expr_stmt_ ;
+statement ::= prep-stmt | package-stmt | import-stmt | var-stmt | block-stmt | namespace-stmt | using-stmt | if-stmt | switch-stmt | while-stmt | loop-stmt | for-stmt | foreach-stmt | control-stmt | function-stmt | return-stmt | try-stmt | throw-stmt | class-stmt | expr-stmt ;
 
-declaration_ ::= prep_stmt_ | namespace_stmt_ | var_stmt_ | using_stmt_ | function_stmt_ | class_stmt_ ;
+declaration ::= prep-stmt | namespace-stmt | var-stmt | using-stmt | function-stmt | class-stmt ;
 
-prep_stmt_ ::= PREP ENDL ;
+prep-stmt ::= PREP ENDL ;
 
-package_stmt_ ::= 'package' ID endline_ ;
+package-stmt ::= 'package' ID endline ;
 
-import_stmt_ ::= 'import' import_list_ endline_ ;
+import-stmt ::= 'import' import-list endline ;
 
-module_list_ ::= ID ['.' ('*' | module_list_ )] ; 
+module-list ::= ID ['.' ('*' | module-list )] ; 
 
-import_list_ ::= module_list_ ['as' ID ] [',' import_list_ ] ;
+import-list ::= module-list ['as' ID ] [',' import-list ] ;
 
-var_def_ ::= var_bind_ '=' basic_expr_ | var_list_;
+var-def ::= var-bind '=' basic-expr | var-list;
 
-var_stmt_ ::= ('var' | 'link' | 'constant') var_def_ endline_ ;
+var-stmt ::= ('var' | 'link' | 'constant') var-def endline ;
 
-var_bind_ ::= '(' var_bind_list_ {',' var_bind_list_} ')' ;
+var-bind ::= '(' var-bind-list {',' var-bind-list} ')' ;
 
-var_bind_list_ ::= ID | '...' | var_bind_ ;
+var-bind-list ::= ID | '...' | var-bind ;
 
-var_list_ ::= ID '=' single_expr_ [',' var_list_];
+var-list ::= ID '=' single-expr [',' var-list];
 
-block_stmt_ ::= 'block' ENDL stmts_ 'end' ENDL;
+block-stmt ::= 'block' ENDL stmts 'end' ENDL;
 
-namespace_stmt_ ::= 'namespace' ID ENDL decl_stmts_ 'end' ENDL;
+namespace-stmt ::= 'namespace' ID ENDL decl-stmts 'end' ENDL;
 
-using_stmt_ ::= 'using' using_list_ endline_;
+using-stmt ::= 'using' using-list endline;
 
-using_list_ ::= module_list_ [',' using_list_];
+using-list ::= module-list [',' using-list];
 
-if_stmt_ ::= 'if' basic_expr_ ENDL stmts_ {else_stmt_ stmts_} 'end' ENDL;
+if-stmt ::= 'if' basic-expr ENDL stmts {else-stmt stmts} 'end' ENDL;
 
-else_stmt_ ::= 'else' ['if' basic_expr_] ENDL ;
+else-stmt ::= 'else' ['if' basic-expr] ENDL ;
 
-switch_stmt_ ::= 'switch' basic_expr_ ENDL switch_stmts_ 'end' ENDL;
+switch-stmt ::= 'switch' basic-expr ENDL switch-stmts 'end' ENDL;
 
-switch_stmts_ ::= {switch_case_ | switch_default_} {ENDL};
+switch-stmts ::= {switch-case | switch-default} {ENDL};
 
-switch_case_ ::= 'case' logic_or_expr_ ENDL stmts_ 'end' ENDL;
+switch-case ::= 'case' logic-or-expr ENDL stmts 'end' ENDL;
 
-switch_default_ ::= 'default' ENDL stmts_ 'end' ENDL;
+switch-default ::= 'default' ENDL stmts 'end' ENDL;
 
-while_stmt_ ::= 'while' basic_expr_ ENDL stmts_ 'end' ENDL;
+while-stmt ::= 'while' basic-expr ENDL stmts 'end' ENDL;
 
-loop_stmt_ ::= 'loop' ENDL stmts_ (until_stmt_ | 'end' | ENDL);
+loop-stmt ::= 'loop' ENDL stmts (until-stmt | 'end' | ENDL);
 
-until_stmt_ ::= 'until' basic_expr_ ENDL;
+until-stmt ::= 'until' basic-expr ENDL;
 
-for_stmt_ ::= 'for' [var_def_] (';' | ',') [basic_expr_] (';' | ',') [basic_expr_] for_body_;
+for-stmt ::= 'for' [var-def] (';' | ',') [basic-expr] (';' | ',') [basic-expr] for-body;
 
-foreach_stmt_ ::= 'foreach' ID 'in' basic_expr_ for_body_;
+foreach-stmt ::= 'foreach' ID 'in' basic-expr for-body;
 
-for_body_ ::= ('do' basic_expr_ endline_ | ENDL stmts_ 'end' ENDL);
+for-body ::= ('do' basic-expr endline | ENDL stmts 'end' ENDL);
 
-function_stmt_ ::= 'function' ID '(' [argument_list_] ')' ['override'] function_body_;
+function-stmt ::= 'function' ID '(' [argument-list] ')' ['override'] function-body;
 
-function_body_ ::= ( [ENDL] '{'[ENDL] stmts_ '}' | ENDL stmts_ 'end' ENDL);
+function-body ::= ( [ENDL] '{'[ENDL] stmts '}' | ENDL stmts 'end' ENDL);
 
-return_stmt_ ::= 'return' [expr_] endline_;
+return-stmt ::= 'return' [expr] endline;
 
-try_stmt_ ::= 'try' ENDL stmts_ {catch_stmt_ stmts_} 'end' ENDL;
+try-stmt ::= 'try' ENDL stmts {catch-stmt stmts} 'end' ENDL;
 
-catch_stmt_ ::= 'catch' ID [':' visit_expr_]  ENDL;
+catch-stmt ::= 'catch' ID [':' visit-expr]  ENDL;
 
-throw_stmt_ ::= 'throw' [expr_] endline_;
+throw-stmt ::= 'throw' [expr] endline;
 
-class_stmt_ ::= ('class' | 'struct') ID ['extends' visit_expr_] ENDL decl_stmts_ 'end' ENDL;
+class-stmt ::= ('class' | 'struct') ID ['extends' visit-expr] ENDL decl-stmts 'end' ENDL;
 
-control_stmt_ ::= ('break' | 'continue') endline_;
+control-stmt ::= ('break' | 'continue') endline;
 
-expr_stmt_ ::= expr_ endline_;
+expr-stmt ::= expr endline;
 
-end_stmt_ ::= 'end' ENDL;
+end-stmt ::= 'end' ENDL;
 
-expr_ ::= single_expr_ [',' expr_];
+expr ::= single-expr [',' expr];
 
-single_expr_ ::= lambda_expr_ | basic_expr_;
+single-expr ::= lambda-expr | basic-expr;
 
-basic_expr_ ::= var_bind_ '=' cond_expr_ | cond_expr_ [asi_op_ single_expr_];
+basic-expr ::= var-bind '=' cond-expr | cond-expr [asi-op single-expr];
 
-asi_op_ ::= '=' | ':=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' ;
+asi-op ::= '=' | ':=' | '+=' | '-=' | '*=' | '/=' | '%=' | '^=' ;
 
-lambda_expr_ ::= '[' [capture_list_] ']' '(' [argument_list_] ')' lambda_body_;
+lambda-expr ::= '[' [capture-list] ']' '(' [argument-list] ')' lambda-body;
 
-capture_list_ ::= ['='] ID {',' capture_list_} ;
+capture-list ::= ['='] ID {',' capture-list} ;
 
-argument_list_ ::= '...' ID | ['='] ID [':' visit_expr_] {',' argument_list_};
+argument-list ::= '...' ID | ['='] ID [':' visit-expr] {',' argument-list};
 
-lambda_body_ ::= '{' {statement_ {ENDL}} '}' | '->' cond_expr_;
+lambda-body ::= '{' {statement {ENDL}} '}' | '->' cond-expr;
 
-cond_expr_ ::= logic_or_expr_ [cond_postfix_];
+cond-expr ::= logic-or-expr [cond-postfix];
 
-cond_postfix_ ::= '?' logic_or_expr_ ':' cond_expr_ | ':' logic_or_expr_;
+cond-postfix ::= '?' logic-or-expr ':' cond-expr | ':' logic-or-expr;
 
-logic_or_expr_ ::= logic_and_expr_ [('||' | 'or' ) logic_or_expr_];
+logic-or-expr ::= logic-and-expr [('||' | 'or' ) logic-or-expr];
 
-logic_and_expr_ ::= equal_expr_ [('&&' | 'and') logic_and_expr_];
+logic-and-expr ::= equal-expr [('&&' | 'and') logic-and-expr];
 
-equal_expr_ ::= relat_expr_ [('==' | '!=' | 'is' | 'not') equal_expr_];
+equal-expr ::= relat-expr [('==' | '!=' | 'is' | 'not') equal-expr];
 
-relat_expr_ ::= add_expr_ [('>' | '<' | '>=' | '<=') relat_expr_];
+relat-expr ::= add-expr [('>' | '<' | '>=' | '<=') relat-expr];
 
-add_expr_ ::= mul_expr_ [('+' | '-') add_expr_];
+add-expr ::= mul-expr [('+' | '-') add-expr];
 
-mul_expr_ ::= unary_expr_ [('*' | '/' | '%' | '^') mul_expr_];
+mul-expr ::= unary-expr [('*' | '/' | '%' | '^') mul-expr];
 
-unary_expr_ ::= unary_op_ unary_expr_ | ('new' | 'gcnew') unary_expr_ [array_] | prim_expr_ [postfix_expr_];
+unary-expr ::= unary-op unary-expr | ('new' | 'gcnew') unary-expr [array] | prim-expr [postfix-expr];
 
-unary_op_ ::= 'typeid' | '++' | '--' | '*' | '&' | '-' | '!' | 'not';
+unary-op ::= 'typeid' | '++' | '--' | '*' | '&' | '-' | '!' | 'not';
 
-postfix_expr_ ::= ('++' | '--' | '...')  [postfix_expr_];
+postfix-expr ::= ('++' | '--' | '...')  [postfix-expr];
 
-prim_expr_ ::= visit_expr_ | constant_ ;
+prim-expr ::= visit-expr | constant ;
 
-visit_expr_ ::= object_ [ ('->' | '.') visit_expr_ ];
+visit-expr ::= object [ ('->' | '.') visit-expr ];
 
-object_ ::= array_ [index_] | STR [index_] | 'local' | 'global' | element_ | CHAR;
+object ::= array [index] | STR [index] | 'local' | 'global' | element | CHAR;
 
-element_ ::= (ID | '(' single_expr_ ')') {fcall_ | index_};
+element ::= (ID | '(' single-expr ')') {fcall | index};
 
-constant_ ::= NUM | 'null' | 'true' | 'false';
+constant ::= NUM | 'null' | 'true' | 'false';
 
-array_ ::= '{' [expr_] '}';
+array ::= '{' [expr] '}';
 
-fcall_ ::= '(' [expr_] ')';
+fcall ::= '(' [expr] ')';
 
-index_ ::= '[' basic_expr_ ']';
+index ::= '[' basic-expr ']';

@@ -27,7 +27,7 @@ constant syntax = parsergen.syntax
 @begin
 var covscript_lexical = {
     "endl" : regex.build("^\\n+$"),
-    "id" : regex.build("^[A-Za-z_]\\w*$"),
+    "id" : regex.build("^[A-Za-z]\\w*$"),
     "num" : regex.build("^[0-9]+\\.?([0-9]+)?$"),
     "str" : regex.build("^(\"|\"([^\"]|\\\\\")*\"?)$"),
     "char" : regex.build("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),

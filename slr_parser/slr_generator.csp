@@ -8,43 +8,76 @@ function test()
 end
 
 class compress_tree
-    var tree = "";
-
-    function test1() 
-        system.out.println("test")
-    end
-
-    function show_trees(node, depth)
-        foreach i in range(depth) do system.out.print("\t")
-        system.out.println(node.root)
-        foreach son in node.nodes do show_trees(son, depth + 1) 
-    end
+    var tree = null;
 
     function compress_tree(node)
         
-        for iter = node.nodes.begin, iter != node.nodes.end, iter.next()
-            compress_tree(iter.data)
-            var dat = iter.data
-            if dat.nodes.size == 1 && dat.nodes[0].root == "NULL"
-                iter = node.nodes.erase(iter)
-                iter.prev()
-            end
-        end
+        foreach it in node.nodes
 
-        # for iter = node.nodes.begin, iter != node.nodes.end, iter++
-        #     if iter.data.root == "%DELETED%"
-        #         iter = node.nodes.erase(iter)
-        #     end
-        # end
+            while typeid it == typeid slr_parser.tree_type && it.nodes.size == 1
+                it = it.nodes.front
+             end
+
+            if typeid it == typeid slr_parser.tree_type
+                compress_tree(it)
+            else
+                if it.type == "ENDL"
+                    it.data = "\\n"
+                end
+            end
+
+        end
 
     end
     
+    function put_extra_term(node)
+    
+        if node == null
+            return 
+        end
+        for iter = node.nodes.begin, iter != node.nodes.end, iter.next()    
+            link it = iter.data
+ 
+            #find ebnf term
+            if typeid it == typeid slr_parser.tree_type && it.root.find("#", 0) != -1
+                #find useless term
+                if it.nodes.size == 1 && typeid it.nodes[0] == typeid slr_parser.tree_type && it.nodes[0].root == "NULL"
+                    
+                    iter = node.nodes.erase(iter)
+                    iter.prev()
+                    continue
+                else
+
+                    var count = 1
+                    iter.next()
+                    foreach n in it.nodes
+                        iter = node.nodes.insert(iter, n)
+                        iter.next()
+                        count++
+                    end
+                    foreach i in range(count) 
+                        iter.prev()
+                    end
+                   iter = node.nodes.erase(iter)  
+                end
+            end
+ 
+            link nnode = iter.data
+         # slr_parser.show_trees(tree, 0)
+            if typeid nnode == typeid slr_parser.tree_type
+               put_extra_term(nnode)
+            end
+        end
+        
+    end
+
     function run(treenode)
         tree = treenode
-        show_trees(tree, 0)
+        put_extra_term(tree)
+        # system.out.println("##########COMPRESSED TREE#########")
+        # slr_parser.show_trees(tree, 0)
         compress_tree(tree)
-        system.out.println("##########COMPRESSED TREE#########")
-        show_trees(tree, 0)
+        # system.out.println("##########COMPRESSED TREE#########")
     end
 
 end
