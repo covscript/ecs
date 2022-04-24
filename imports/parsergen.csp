@@ -1,5 +1,5 @@
-# Covariant Script Parser Generator v1.2.3 Release
-# Release Date: Sun Apr 24 11:39:18 2022
+# Covariant Script Parser Generator v1.2.4 Release
+# Release Date: Sun Apr 24 15:32:29 2022
 # Copyright (C) 2017-2022 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
@@ -349,6 +349,7 @@ class parser_type
         switch it.type
             case syntax_type.token
                 if eof()
+                    error("Early EOF, expected token \'" + it.data + "\'", lex.back.pos)
                     return parse_state.eof
                 end
                 if peek().type != it.data
@@ -361,12 +362,13 @@ class parser_type
                     push_token()
                     return parse_state.accept
                 else
-                    error("Unexpected Token \'" + peek().data + "\'", peek().pos)
+                    error("Unexpected token \'" + peek().data + "\', expected <" + it.data + ">", peek().pos)
                     return parse_state.reject
                 end
             end
             case syntax_type.term
                 if eof()
+                    error("Early EOF, expected token \'" + it.data + "\'", lex.back.pos)
                     return parse_state.eof
                 end
                 if peek().data != it.data
@@ -379,7 +381,7 @@ class parser_type
                     push_token()
                     return parse_state.accept
                 else
-                    error("Unexpected Token \'" + peek().data + "\'", peek().pos)
+                    error("Unexpected token \'" + peek().data + "\', expected \'" + it.data + "\'", peek().pos)
                     return parse_state.reject
                 end
             end
@@ -633,26 +635,7 @@ class parser_type
         on_ign = false
         lex = lex_output
         push_stage("begin")
-        var result = match_syntax(syn.begin)
-        if stack.size != 1
-            error("Production not complete.", {0, 0})
-        end
-        switch result
-            case parse_state.accept
-                if !eof()
-                    error("Cannot reach EOF.", peek().pos)
-                    return false
-                end
-            end
-            case parse_state.reject
-                return false
-            end
-            case parse_state.eof
-                error("Production not complete.", {0, 0})
-                return false
-            end
-        end
-        return true
+        return match_syntax(syn.begin) == parse_state.accept && stack.size == 1 && eof()
     end
     function run(grammar, lex_output)
         init(grammar)
