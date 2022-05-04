@@ -1,5 +1,5 @@
-# Covariant Script Parser Generator v1.2.4 Release
-# Release Date: Sun Apr 24 15:32:29 2022
+# Covariant Script Parser Generator v1.2.5 Release
+# Release Date: Wed May 04 09:38:31 2022
 # Copyright (C) 2017-2022 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
@@ -448,7 +448,7 @@ class parser_type
                         end
                         case parse_state.eof
                             pop_stage()
-                            return parse_state.eof
+                            return parse_state.accept
                         end
                     end
                 end
@@ -476,7 +476,7 @@ class parser_type
                     end
                     case parse_state.eof
                         pop_stage()
-                        return parse_state.eof
+                        return parse_state.accept
                     end
                 end
             end
@@ -694,7 +694,7 @@ class generator
             lexer = new lexer_type
             if rules[lang].lex == null
                 print_header("Lexical rules not found! Stop")
-                return
+                return false
             end
             token_buff = lexer.run(rules[lang].lex, input)
             if !lexer.error_log.empty()
@@ -705,23 +705,27 @@ class generator
                 end
                 print_error(file_path, code_buff, lexer.error_log)
                 if stop_on_error
-                    return
+                    return false
                 end
             end
             parser = new parser_type
             parser.log = enable_log
             if rules[lang].stx == null
                 print_header("Syntactic rules not found! Stop")
-                return
+                return false
             end
             if parser.run(rules[lang].stx, token_buff)
                 ast = parser.production()
+                return true
             else
                 print_header("Compilation Error")
                 var err = {(lexer.error_log)..., (parser.get_log(0))...}
                 err.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
                 print_error(file_path, code_buff, err)
+                return false
             end
+        else
+            return false
         end
     end
     function add_grammar(lang, gram)
@@ -730,7 +734,7 @@ class generator
     function from_file(path)
         var ifs = iostream.ifstream(path)
         if !ifs.good()
-            return
+            return false
         end
         file_path = path
         input = new string
@@ -748,14 +752,14 @@ class generator
         foreach it in rules
             var reg = regex.build(it.second.ext)
             if !reg.match(path).empty()
-                priv_run(it.first)
-                return
+                return priv_run(it.first)
             end
         end
+        return false
     end
     function from_string(lang, str)
         input = str
         code_buff = input.split({'\n'})
-        priv_run(lang)
+        return priv_run(lang)
     end
 end
