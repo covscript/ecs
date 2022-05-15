@@ -79,7 +79,7 @@ function crc32_file(path)
     return crc32val.logic_xor("0xFFFFFFFF"hex).to_hash()
 end
 
-var wrapper_ver = "1.2"
+var wrapper_ver = "1.3"
 
 function show_version()
 @begin
@@ -183,8 +183,9 @@ function main(cmd_args)
         system.out.println("Error: invalid input file.")
         system.exit(0)
     end
+    var crc32 = null
     if !no_crc32
-        var crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
+        crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
         if output == null
             minmal = true
             if system.file.exist("./.ecs_output/" + crc32)
