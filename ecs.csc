@@ -79,7 +79,7 @@ function crc32_file(path)
     return crc32val.logic_xor("0xFFFFFFFF"hex).to_hash()
 end
 
-var wrapper_ver = "1.1"
+var wrapper_ver = "1.2"
 
 function show_version()
 @begin
@@ -208,13 +208,17 @@ function main(cmd_args)
             var result = ecs_reg.match(file_name)
             if !result.empty()
                 var name = codegen.run(output + system.path.separator + result.str(1).split({'\\', '/'})[-1], parser.ast)
-                iostream.ofstream("./.ecs_output/" + crc32).println(name)
+                if !no_crc32
+                    iostream.ofstream("./.ecs_output/" + crc32).println(name)
+                end
                 system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
             end
         else
             system.path.mkdir_p("./.ecs_output/")
             var name = codegen.run("./.ecs_output/" + to_string(runtime.hash(file_name)), parser.ast)
-            iostream.ofstream("./.ecs_output/" + crc32).println(name)
+            if !no_crc32
+                iostream.ofstream("./.ecs_output/" + crc32).println(name)
+            end
             system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
         end
     end
