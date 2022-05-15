@@ -79,10 +79,12 @@ function crc32_file(path)
     return crc32val.logic_xor("0xFFFFFFFF"hex).to_hash()
 end
 
+var wrapper_ver = "1.1"
+
 function show_version()
 @begin
     system.out.println(
-        "Version: " + ecs_generator.ecs_info.version + "\n" +
+        "Version: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
         "Copyright (C) 2017-2022 Michael Lee. All rights reserved.\n" +
         "Please visit http://covscript.org.cn/ for more information.\n\n" +
         "Metadata:\n" +
@@ -100,6 +102,7 @@ function show_help()
         "    Option    Function\n" +
         "   -h         Show help information\n" +
         "   -v         Show version infomation\n" +
+        "   -f         Disable compile cache\n" +
         "   -m         Disable beautify\n" +
         "   -c         Check grammar only\n" +
         "   -o <PATH>  Set output path\n" +
@@ -112,6 +115,7 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
+var no_crc32 = false
 var minmal = false
 var no_run = false
 var output = null
@@ -129,6 +133,9 @@ function process_args(cmd_args)
             end
             case "-h"
                 show_help()
+            end
+            case "-f"
+                no_crc32 = true
             end
             case "-m"
                 minmal = true
@@ -176,12 +183,14 @@ function main(cmd_args)
         system.out.println("Error: invalid input file.")
         system.exit(0)
     end
-    var crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
-    if output == null
-        minmal = true
-        if system.file.exist("./.ecs_output/" + crc32)
-            var name = iostream.ifstream("./.ecs_output/" + crc32).getline()
-            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+    if !no_crc32
+        var crc32 = to_string(crc32_file(file_name)) + ".ecs_cache"
+        if output == null
+            minmal = true
+            if system.file.exist("./.ecs_output/" + crc32)
+                var name = iostream.ifstream("./.ecs_output/" + crc32).getline()
+                system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+            end
         end
     end
     var parser = new parsergen.generator
