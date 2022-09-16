@@ -79,7 +79,7 @@ function crc32_file(path)
     return crc32val.logic_xor("0xFFFFFFFF"hex).to_hash()
 end
 
-var wrapper_ver = "1.3"
+var wrapper_ver = "1.3.0"
 
 function show_version()
 @begin
