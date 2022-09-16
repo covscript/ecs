@@ -1,5 +1,5 @@
-# Covariant Script Parser Generator v1.2.5 Release
-# Release Date: Wed May 04 09:38:31 2022
+# Covariant Script Parser Generator v1.2.6 Release
+# Release Date: Fri Sep 16 10:47:53 2022
 # Copyright (C) 2017-2022 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
@@ -295,6 +295,11 @@ class parser_type
         foreach it in seq
             var result = this.match(it)
             if result != parse_state.accept
+                if cursor() >= lex.size
+                    error("Incomplete sentence", lex.back.pos)
+                else
+                    error("Incomplete sentence", peek().pos)
+                end
                 return result
             end
         end
