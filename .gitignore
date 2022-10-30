@@ -1,3 +1,4 @@
+.DS_Store
 .ecs_output/
 release/wix/bin/
 release/wix/imports/

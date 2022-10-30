@@ -28,6 +28,7 @@ Options:
     Option    Function
    -h         Show help information
    -v         Show version infomation
+   -f         Disable compile cache
    -m         Disable beautify
    -c         Check grammar only
    -o <PATH>  Set output path
