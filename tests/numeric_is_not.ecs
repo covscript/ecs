@@ -1,0 +1,14 @@
+var a = 1
+var b = 1.0
+if a is integer
+    system.out.println("Pass")
+end
+if a not float
+    system.out.println("Pass")
+end
+if b not integer
+    system.out.println("Pass")
+end
+if b is float
+    system.out.println("Pass")
+end

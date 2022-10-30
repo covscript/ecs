@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.2.0
+# Extended Covariant Script Header: v1.2.1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,27 +22,47 @@ import sdk_extension as sdk
 
 package ecs
 
+# Types
+
+namespace type_validator
+    function __type(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.type
+    end
+    function __range(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.range
+    end
+    function __istream(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.istream
+    end
+    function __ostream(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.ostream
+    end
+    function __function(obj)
+        link real_type = sdk.typeids.get_real(obj)
+        return real_type == sdk.typeids.callable || real_type == sdk.typeids.memberfn
+    end
+    function __exception(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.exception
+    end
+    function __namespace(obj)
+        return sdk.typeids.get_real(obj) == sdk.typeids.namespace
+    end
+    function __integer(obj)
+        return typeid(obj) == typeid(number) && obj.is_integer()
+    end
+    function __float(obj)
+        return typeid(obj) == typeid(number) && obj.is_float()
+    end
+end
+
 @begin
 var special_type = {
-    "type"      : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.type),
-    "range"     : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.range),
-    "istream"   : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.istream),
-    "ostream"   : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.ostream),
-    "function"  : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.callable || sdk.typeids.get_real(obj) == sdk.typeids.memberfn),
-    "exception" : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.exception),
-    "namespace" : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.namespace),
-    "integer"   : ([](obj)->typeid(obj) == typeid(number) && obj.is_integer()),
-    "float"     : ([](obj)->typeid(obj) == typeid(number) && obj.is_float())
-}.to_hash_map()
+    "type", "range", "istream", "ostream", "function", "exception", "namespace",
+    "integer", "float"
+}.to_hash_set()
 @end
 
-function validate_type(id, type)
-    return typeid id == typeid type
-end
-
-function validate_type_s(id, type)
-    return special_type.at(type)(id)
-end
+# Exceptions
 
 var current_except = null
 
