@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.1.0
+# Extended Covariant Script Header: v1.2.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,13 +24,15 @@ package ecs
 
 @begin
 var special_type = {
-    "type"      : {sdk.typeids.type}.to_hash_set(),
-    "range"     : {sdk.typeids.range}.to_hash_set(),
-    "istream"   : {sdk.typeids.istream}.to_hash_set(),
-    "ostream"   : {sdk.typeids.ostream}.to_hash_set(),
-    "function"  : {sdk.typeids.callable, sdk.typeids.memberfn}.to_hash_set(),
-    "exception" : {sdk.typeids.exception}.to_hash_set(),
-    "namespace" : {sdk.typeids.namespace}.to_hash_set()
+    "type"      : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.type),
+    "range"     : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.range),
+    "istream"   : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.istream),
+    "ostream"   : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.ostream),
+    "function"  : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.callable || sdk.typeids.get_real(obj) == sdk.typeids.memberfn),
+    "exception" : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.exception),
+    "namespace" : ([](obj)->sdk.typeids.get_real(obj) == sdk.typeids.namespace),
+    "integer"   : ([](obj)->typeid(obj) == typeid(number) && obj.is_integer()),
+    "float"     : ([](obj)->typeid(obj) == typeid(number) && obj.is_float())
 }.to_hash_map()
 @end
 
@@ -39,7 +41,7 @@ function validate_type(id, type)
 end
 
 function validate_type_s(id, type)
-    return special_type.at(type).exist(sdk.typeids.get_real(id))
+    return special_type.at(type)(id)
 end
 
 var current_except = null
