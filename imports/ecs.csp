@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.2.1
+# Extended Covariant Script Header: v1.2.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -103,8 +103,8 @@ function param_gcnew(type, args)
     return move(data)
 end
 
-function check_type_s(name, id, type)
-    if !validate_type_s(id, type)
+function check_type_s(name, id, func)
+    if !func(id)
         throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
     end
 end

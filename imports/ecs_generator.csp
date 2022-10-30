@@ -25,7 +25,7 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 5"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 6"
     constant std_version = "210603"
 end
 
@@ -1150,10 +1150,40 @@ class generator
         var idx = 0
         # Visit id token
         target.print(nodes[idx++].data)
-        # Visit term "="
-        ++idx; target.print(" = ")
-        # Recursive Visit single-expr
-        this.visit_single_expr(nodes[idx++].nodes)
+        # Condition
+        block
+            var matched = false
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "=")
+                matched = true
+                # Visit term "="
+                ++idx; target.print(" = ")
+                # Recursive Visit single-expr
+                this.visit_single_expr(nodes[idx++].nodes)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "as")
+                matched = true
+                # Visit term "as"
+                ++idx; target.print(" = ")
+                # Optional
+                if nodes.size > 3 && (typeid nodes[3] == typeid parsergen.syntax_tree && nodes[3].root == "array")
+                    target.print("ecs.param_new(")
+                    # Recursive Visit unary-expr
+                    this.visit_unary_expr(nodes[idx++].nodes)
+                    target.print(", ")
+                    # Recursive Visit array
+                    this.visit_array(nodes[idx++].nodes)
+                    target.print(")")
+                else
+                    target.print("new ")
+                    # Recursive Visit unary-expr
+                    this.visit_unary_expr(nodes[idx++].nodes)
+                end
+            end
+            if !matched
+            	# Error
+            	return
+            end
+        end
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
@@ -1686,9 +1716,9 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(dat.type)
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println("if !__ecs_catch__ && ecs.validate_type_s(ecs.current_except, \"" + type_id + "\")")
+                    target.println("if !__ecs_catch__ && ecs.type_validator.__" + type_id + "(ecs.current_except)")
                 else
-                    target.print("if !__ecs_catch__ && ecs.validate_type(ecs.current_except, ")
+                    target.print("if !__ecs_catch__ && typeid ecs.current_except == typeid(")
                     this.visit_visit_expr(dat.type)
                     target.println(")")
                 end
@@ -1755,7 +1785,7 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(map["check-type"])
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println("ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", \"" + type_id + "\")")
+                    target.println("ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", ecs.type_validator.__" + type_id + ")")
                 else
                     target.print("ecs.check_type(\"" + stack.front.first + "\", " + stack.front.first + ", ")
                     this.visit_visit_expr(map["check-type"])
@@ -2075,11 +2105,10 @@ class generator
     end
     function run(name, ast)
         var buff = new iostream.char_buff
-        this.target = buff.get_ostream()
-        this.target.println("import ecs")
-        this.visit_begin(ast.nodes)
+        target = buff.get_ostream()
+        visit_begin(ast.nodes)
         var file_name = name + (is_package ? ".csp" : ".csc")
-        this.target = iostream.ofstream(file_name)
+        target = iostream.ofstream(file_name)
         if !is_package
             target.println("#!/usr/bin/env cs")
         end
@@ -2088,6 +2117,7 @@ class generator
             target.println("# DO NOT MODIFY")
             target.print("# Date: " + to_string(runtime.local_time()))
         end
+        target.println("import ecs")
         for i = 0, i < lambda_list.size, ++i
             target.println("struct __ecs_lambda_impl_" + to_string(i + 1) + "__")
             indent = 1
@@ -2147,7 +2177,7 @@ class generator
                     print_indent()
                     var type_id = get_id_of_visit_expr(map["check-type"])
                     if type_id != null && ecs.special_type.exist(type_id)
-                        target.println("ecs.check_type_s(\"" + it.first + "\", " + it.first + ", \"" + type_id + "\")")
+                        target.println("ecs.check_type_s(\"" + it.first + "\", " + it.first + ", ecs.type_validator.__" + type_id + ")")
                     else
                         target.print("ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
                         this.visit_visit_expr(map["check-type"])

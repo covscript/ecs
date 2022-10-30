@@ -1,7 +1,20 @@
-@require: 210602
+@require: 210603
 @charset: utf8
 
 import codec.*
+
+struct test_class
+    function initialize()
+        system.out.println("Constructing test_class...")
+    end
+    function construct(...args)
+        system.out.print("Constructing test_class: ")
+        foreach it in args
+            system.out.print(to_string(it) + " ")
+        end
+        system.out.println("")
+    end
+end
 
 struct my_except
     var xxxx = null
@@ -10,7 +23,7 @@ struct my_except
     end
 end
 
-var a = 0, b = 2
+var a = 0, b = 2, c as test_class, d as test_class{"Hello", "world"}
 var func = [a, =b](=n:number)
 {
     if not n >= 0 && my_except is type
