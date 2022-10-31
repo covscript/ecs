@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
-    <Product Id="*" Name="Extended CovScript 1.3.0 Patch 2" Language="1033" Version="1.3.0.2" Manufacturer="Covariant Script Organization" UpgradeCode="EE550103-C236-7774-F9F1-EE39E951DD57">
+    <Product Id="*" Name="Extended CovScript 1.3.1 Build 7" Language="1033" Version="1.3.1.7" Manufacturer="Covariant Script Organization" UpgradeCode="EE550103-C236-7774-F9F1-EE39E951DD57">
         <Package Id="*" Keywords="Extended CovScript" Description="Extended Covariant Script Runtime" Platform="x86" InstallerVersion="200" Compressed="yes" InstallScope="perMachine" />
 
         <MajorUpgrade

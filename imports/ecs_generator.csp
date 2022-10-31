@@ -25,7 +25,7 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 6"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 7"
     constant std_version = "210603"
 end
 
@@ -56,6 +56,7 @@ class generator
     var target = system.out
     var is_package = false
     var stack = new array
+    var slice_ext = false
     var minmal = false
     var indent = -1
     function error(pos, text)
@@ -1138,13 +1139,43 @@ class generator
         --indent
     end
     function visit_index(nodes)
-        var idx = 0
-        # Visit term "["
-        ++idx; target.print("[")
-        # Recursive Visit basic-expr
-        this.visit_basic_expr(nodes[idx++].nodes)
-        # Visit term "]"
-        ++idx; target.print("]")
+        if nodes.size == 2
+            error(nodes.front.pos, "Expect expression or slicing in index operator.")
+        end
+        if nodes.size > 3
+            var idx = 1
+            slice_ext = true
+            target.print(".ecs_slice_ext(")
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
+                this.visit_add_expr(nodes[idx].nodes)
+                ++idx
+            else
+                target.print("null")
+            end
+            target.print(", ")
+            ++idx
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
+                this.visit_add_expr(nodes[idx].nodes)
+                ++idx
+            else
+                target.print("null")
+            end
+            target.print(", ")
+            ++idx
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
+                this.visit_add_expr(nodes[idx].nodes)
+                ++idx
+            else
+                target.print("null")
+            end
+            target.print(")")
+        else
+            if typeid nodes[1] == typeid parsergen.syntax_tree && nodes[1].root == "add-expr"
+                target.print("[")
+                this.visit_add_expr(nodes[1].nodes)
+                target.print("]")
+            end
+        end
     end
     function visit_var_list(nodes)
         var idx = 0
@@ -2118,6 +2149,10 @@ class generator
             target.print("# Date: " + to_string(runtime.local_time()))
         end
         target.println("import ecs")
+        if slice_ext
+            target.println("import sdk_extension as __ecs_sdk")
+            target.println("__ecs_sdk.extend_type(array, \"ecs_slice_ext\", ecs.ecs_slice_ext)")
+        end
         for i = 0, i < lambda_list.size, ++i
             target.println("struct __ecs_lambda_impl_" + to_string(i + 1) + "__")
             indent = 1
