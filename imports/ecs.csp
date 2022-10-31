@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.2.3
+# Extended Covariant Script Header: v1.2.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -125,6 +125,9 @@ class slice_step_error
     function construct(msg)
         error_text = to_string(msg)
     end
+    function what()
+        return error_text
+    end
 end
 
 function ecs_slice_ext(arr, beg, end, step)
@@ -145,7 +148,7 @@ function ecs_slice_ext(arr, beg, end, step)
     end
     if range_begin > range_end
         if range_step >= 0
-            throw_exception(param_new(slice_step_error, "Use positive step in negative range."))
+            throw_exception(param_new(slice_step_error, {"Use positive step in negative range."}))
         end
         while range_begin >= range_end
             slice_data.push_back(arr[range_begin])
@@ -153,7 +156,7 @@ function ecs_slice_ext(arr, beg, end, step)
         end
     else
         if range_step <= 0
-            throw_exception(param_new(slice_step_error, "Use negative step in positive range."))
+            throw_exception(param_new(slice_step_error, {"Use negative step in positive range."}))
         end
         while range_begin <= range_end
             slice_data.push_back(arr[range_begin])

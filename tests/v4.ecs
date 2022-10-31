@@ -12,3 +12,13 @@ system.out.println(arr[1:5:2])
 system.out.println(arr[5:1:-2])
 system.out.println(arr[-1:5:3])
 system.out.println(arr[5:-1:-3])
+try
+    arr[1:5:-1]
+catch e:ecs.slice_step_error
+    system.out.println("Pass, " + e.what())
+end
+try
+    arr[5:1:1]
+catch e:ecs.slice_step_error
+    system.out.println("Pass, " + e.what())
+end
