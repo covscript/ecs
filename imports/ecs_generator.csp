@@ -25,8 +25,8 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 7"
-    constant std_version = "210603"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 8"
+    constant std_version = "210604"
 end
 
 import parsergen, ecs
@@ -53,6 +53,8 @@ class generator
     var lambda_list = new array
     var file_name = new string
     var code_buff = new array
+    var csx_hook = new hash_map
+    var csx_path = {"."}
     var target = system.out
     var is_package = false
     var stack = new array
@@ -65,6 +67,12 @@ class generator
         err.pos = pos
         parsergen.print_error(file_name, code_buff, {err})
         system.exit(0)
+    end
+    function warning(pos, text)
+        var err = new parsergen.lex_error
+        err.text = "warning: " + text
+        err.pos = pos
+        parsergen.print_error(file_name, code_buff, {err})
     end
     function print_indent()
         if !minmal
@@ -103,6 +111,24 @@ class generator
             end
         end
         return null
+    end
+    function register_csx(path, hook)
+        var csx = context.source_import(path)
+        csx.ecsx_main(hook)
+    end
+    function find_csp_ext(name)
+        var csx_search = csx_path
+        var csp_import = system.getenv("CS_IMPORT_PATH")
+        if csp_import != null
+            foreach it in csp_import.split({system.path.delimiter}) do csx_search.push_back(it)
+        end
+        foreach path in csx_search
+            var full = path + system.path.separator + name + ".ecsx"
+            if system.file.exist(full)
+                csx_hook.insert(name, new hash_map)
+                return register_csx(full, csx_hook.at(name))
+            end
+        end
     end
     function visit_declaration(nodes)
         print_indent()
@@ -1313,6 +1339,16 @@ class generator
         # Recursive Visit endline
         this.visit_endline(nodes[idx++].nodes)
     end
+    function visit_csx_extend(nodes)
+        var csx = nodes[0].data, func = nodes[2].data, ast = nodes.size > 5 ? nodes[4] : null
+        if !csx_hook.exist(csx)
+            error(nodes[0].pos, "CSX extend module not found.")
+        end
+        if !csx_hook.at(csx).exist(func)
+            error(nodes[2].pos, "Function not found in CSX extend module.")
+        end
+        csx_hook.at(csx).at(func)(this, ast, nodes[2].pos)
+    end
     function visit_object(nodes)
         var idx = 0
         # Condition
@@ -1347,6 +1383,11 @@ class generator
                 matched = true
                 # Visit term "global"
                 ++idx; target.print("global")
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "csx_extend")
+                matched = true
+                # Recursive Visit csx_extend
+                this.visit_csx_extend(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "element")
                 matched = true
@@ -1629,6 +1670,7 @@ class generator
         stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
         if !stack.front.list.empty()
+            find_csp_ext(stack.front.list.front.data)
             if stack.front.list.back.data == "*"
                 stack.front.list.pop_back()
                 wildcard = true

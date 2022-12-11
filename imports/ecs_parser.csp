@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.1
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,13 +31,13 @@ var covscript_lexical = {
     "num" : regex.build("^[0-9]+\\.?([0-9]+)?$"),
     "str" : regex.build("^(\"|\"([^\"]|\\\\\")*\"?)$"),
     "char" : regex.build("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
-    "bsig" : regex.build("^(;|:=?|\\?|\\.\\.?|\\.\\.\\.)$"),
+    "bsig" : regex.build("^(;|::?|:=?|\\?|\\.\\.?|\\.\\.\\.)$"),
     "msig" : regex.build("^(\\+(\\+|=)?|-(-|=|>)?|\\*=?|/=?|%=?|\\^=?)$"),
     "lsig" : regex.build("^(>|<|&|(\\|)|&&|(\\|\\|)|!|==?|!=?|>=?|<=?)$"),
     "brac" : regex.build("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
     "prep" : regex.build("^@.*$"),
     "ign" : regex.build("^([ \\f\\r\\t\\v]+|#.*)$"),
-    "err" : regex.build("^(\"|\'|(\\|)|\\.\\.)$")
+    "err" : regex.build("^(\"|\'|(\\|)|:|\\.\\.)$")
 }.to_hash_map()
 @end
 
@@ -307,9 +307,13 @@ var covscript_syntax = {
         {syntax.token("str"), syntax.optional(syntax.ref("index"))},
         {syntax.term("local")},
         {syntax.term("global")},
+        {syntax.ref("csx_extend")},
         {syntax.ref("element")},
         {syntax.token("char")}
     )},
+    "csx_extend" : {
+        syntax.token("id"), syntax.term("::"), syntax.token("id"), syntax.term("("), syntax.optional(syntax.ref("cond-expr")), syntax.term(")")
+    },
     "element" : {
         syntax.cond_or({syntax.token("id")}, {syntax.term("("), syntax.ref("single-expr"), syntax.term(")")}),
         syntax.repeat(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))

@@ -3,7 +3,7 @@
 import parsergen, ecs_parser, ecs_generator
 import codec, regex
 
-var wrapper_ver = "1.3.1"
+var wrapper_ver = "1.3.2"
 
 function show_version()
 @begin
@@ -29,6 +29,7 @@ function show_help()
         "   -f         Disable compile cache\n" +
         "   -m         Disable beautify\n" +
         "   -c         Check grammar only\n" +
+        "   -i <PATH>  Set import path\n" +
         "   -o <PATH>  Set output path\n" +
         "   -- <ARGS>  Pass parameters to CovScript\n"
     )
@@ -39,6 +40,7 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
+var csx_path = new string
 var no_hash = false
 var minmal = false
 var no_run = false
@@ -66,6 +68,13 @@ function process_args(cmd_args)
             end
             case "-c"
                 no_run = true
+            end
+            case "-i"
+                if index == cmd_args.size - 1
+                    system.out.println("Error: Option \"-i\" not completed. Usage: \"ecs -i <PATH>\"")
+                    system.exit(0)
+                end
+                csx_path = cmd_args[++index]
             end
             case "-o"
                 if index == cmd_args.size - 1
@@ -126,8 +135,10 @@ function main(cmd_args)
             system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + file_name + arguments))
         end
         var codegen = new ecs_generator.generator
+        compiler_args += " -i \"" + csx_path + "\""
         codegen.code_buff = parser.code_buff
         codegen.file_name = file_name
+        codegen.csx_path = {".", (csx_path.split({system.path.delimiter}))...}
         codegen.minmal = minmal
         if output != null
             var result = ecs_reg.match(file_name)
