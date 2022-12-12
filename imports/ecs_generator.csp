@@ -25,7 +25,7 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 8"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 9"
     constant std_version = "210604"
 end
 
@@ -53,8 +53,8 @@ class generator
     var lambda_list = new array
     var file_name = new string
     var code_buff = new array
-    var csx_hook = new hash_map
-    var csx_path = {"."}
+    var ecsx_hook = new hash_map
+    var ecsx_path = {"."}
     var target = system.out
     var is_package = false
     var stack = new array
@@ -112,21 +112,22 @@ class generator
         end
         return null
     end
-    function register_csx(path, hook)
-        var csx = context.source_import(path)
-        csx.ecsx_main(hook)
+    function register_ecsx(path, hook)
+        var ecsx = context.source_import(path)
+        ecsx.ecsx_main(hook)
     end
-    function find_csp_ext(name)
-        var csx_search = csx_path
+    function find_ecsx(name)
+        var ecsx_search = ecsx_path
         var csp_import = system.getenv("CS_IMPORT_PATH")
         if csp_import != null
-            foreach it in csp_import.split({system.path.delimiter}) do csx_search.push_back(it)
+            foreach it in csp_import.split({system.path.delimiter}) do ecsx_search.push_back(it)
         end
-        foreach path in csx_search
+        foreach path in ecsx_search
             var full = path + system.path.separator + name + ".ecsx"
             if system.file.exist(full)
-                csx_hook.insert(name, new hash_map)
-                return register_csx(full, csx_hook.at(name))
+                var hooks = new hash_map
+                register_ecsx(full, hooks)
+                return {name, hooks}
             end
         end
     end
@@ -1339,15 +1340,15 @@ class generator
         # Recursive Visit endline
         this.visit_endline(nodes[idx++].nodes)
     end
-    function visit_csx_extend(nodes)
-        var csx = nodes[0].data, func = nodes[2].data, ast = nodes.size > 5 ? nodes[4] : null
-        if !csx_hook.exist(csx)
-            error(nodes[0].pos, "CSX extend module not found.")
+    function visit_ecsx_extend(nodes)
+        var ecsx = nodes[0].data, func = nodes[2].data, ast = nodes.size > 5 ? nodes[4] : null
+        if !ecsx_hook.exist(ecsx)
+            error(nodes[0].pos, "ECSX extend module not found.")
         end
-        if !csx_hook.at(csx).exist(func)
-            error(nodes[2].pos, "Function not found in CSX extend module.")
+        if !ecsx_hook.at(ecsx).exist(func)
+            error(nodes[2].pos, "Function not found in ECSX extend module.")
         end
-        csx_hook.at(csx).at(func)(this, ast, nodes[2].pos)
+        ecsx_hook.at(ecsx).at(func)(this, ast, nodes[2].pos)
     end
     function visit_object(nodes)
         var idx = 0
@@ -1384,10 +1385,10 @@ class generator
                 # Visit term "global"
                 ++idx; target.print("global")
             end
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "csx_extend")
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "ecsx_extend")
                 matched = true
-                # Recursive Visit csx_extend
-                this.visit_csx_extend(nodes[idx++].nodes)
+                # Recursive Visit ecsx_extend
+                this.visit_ecsx_extend(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "element")
                 matched = true
@@ -1669,8 +1670,9 @@ class generator
         # Recursive Visit module-list
         stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
+        var ecsx = null
         if !stack.front.list.empty()
-            find_csp_ext(stack.front.list.front.data)
+            ecsx = find_ecsx(stack.front.list.front.data)
             if stack.front.list.back.data == "*"
                 stack.front.list.pop_back()
                 wildcard = true
@@ -1694,11 +1696,18 @@ class generator
             # Visit term "as"
             ++idx; target.print(" as ")
             # Visit id token
-            target.print(nodes[idx++].data)
+            link alias = nodes[idx++].data
+            target.print(alias)
+            if ecsx != null
+                ecsx[0] = alias
+            end
         else
             if !stack.front.list.empty()
                 target.print(" as " + stack.front.list.back.data)
             end
+        end
+        if ecsx != null
+            ecsx_hook.insert(ecsx...)
         end
         stack.pop_front()
         # Optional
