@@ -1,6 +1,5 @@
 @echo off
-set CURRENT_FOLDER=%~dp0
-set ARGS="%CURRENT_FOLDER%\ecs.csc"
+set ARGS="%~dp0\ecs"
 :LOOP
     set index=%1
     if %index%! == ! goto END
