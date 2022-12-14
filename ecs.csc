@@ -3,7 +3,7 @@
 import parsergen, ecs_parser, ecs_generator
 import codec, regex
 
-var wrapper_ver = "1.3.2"
+var wrapper_ver = "1.3.3"
 
 function show_version()
 @begin

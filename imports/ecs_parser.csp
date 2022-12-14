@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.2
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,13 +31,13 @@ var covscript_lexical = {
     "num" : regex.build("^[0-9]+\\.?([0-9]+)?$"),
     "str" : regex.build("^(\"|\"([^\"]|\\\\\")*\"?)$"),
     "char" : regex.build("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
-    "bsig" : regex.build("^(;|::?|:=?|\\?|\\.\\.?|\\.\\.\\.)$"),
+    "bsig" : regex.build("^(;|:=?|::|\\?|\\.\\.?|\\.\\.\\.)$"),
     "msig" : regex.build("^(\\+(\\+|=)?|-(-|=|>)?|\\*=?|/=?|%=?|\\^=?)$"),
     "lsig" : regex.build("^(>|<|&|(\\|)|&&|(\\|\\|)|!|==?|!=?|>=?|<=?)$"),
     "brac" : regex.build("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
     "prep" : regex.build("^@.*$"),
     "ign" : regex.build("^([ \\f\\r\\t\\v]+|#.*)$"),
-    "err" : regex.build("^(\"|\'|(\\|)|:|\\.\\.)$")
+    "err" : regex.build("^(\"|\'|(\\|)|\\.\\.)$")
 }.to_hash_map()
 @end
 
@@ -330,13 +330,14 @@ var covscript_syntax = {
     "fcall" : {
         syntax.term("("), syntax.optional(syntax.ref("expr")), syntax.term(")")
     },
-    "index" : {
-        syntax.term("["), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")))), syntax.term("]")
-    }
+    "index" : {syntax.cond_or(
+        {syntax.term("["), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")))), syntax.term("]")},
+        {syntax.term("["), syntax.term("::"), syntax.term("]")}
+    )}
 }.to_hash_map()
 @end
 
 var grammar = new parsergen.grammar
 grammar.lex = covscript_lexical
 grammar.stx = covscript_syntax
-grammar.ext = ".*\\.(csp|csc|ecs)"
+grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
