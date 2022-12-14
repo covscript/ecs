@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.3.3
+# Bootstrap of Extended Covariant Script Generator v1.3.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -141,8 +141,12 @@ function main(cmd_args)
         if output == null
             minmal = true
             if system.file.exist("./.ecs_output/" + file_hash)
-                var name = iostream.ifstream("./.ecs_output/" + file_hash).getline()
-                system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+                var ifs = iostream.ifstream("./.ecs_output/" + file_hash)
+                var name = ifs.getline()
+                var mtime = ifs.getline().to_number()
+                if mtime == system.file.mtime(file_name)
+                    system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+                end
             end
         end
     end
@@ -172,7 +176,9 @@ function main(cmd_args)
             system.path.mkdir_p("./.ecs_output/")
             var name = codegen.run("./.ecs_output/" + codec.sha256.hash_str(file_name), parser.ast)
             if !no_hash
-                iostream.ofstream("./.ecs_output/" + file_hash).println(name)
+                var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
+                ofs.println(name)
+                ofs.println(system.file.mtime(file_name))
             end
             system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
         end
