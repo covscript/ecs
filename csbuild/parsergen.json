@@ -1,0 +1,11 @@
+{
+    "Type": "Package",
+    "Name": "parsergen",
+    "Info": "Parser Generator written in Covariant Script",
+    "Author": "Michael Lee",
+    "Version": "1.2.6",
+    "Target": "imports/parsergen.csp",
+    "Dependencies": [
+        "regex"
+    ]
+}
