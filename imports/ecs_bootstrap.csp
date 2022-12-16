@@ -161,7 +161,7 @@ function main(cmd_args)
         compiler_args += " -i \"" + csx_path + "\""
         codegen.code_buff = parser.code_buff
         codegen.file_name = file_name
-        codegen.ecsx_path = {".", (csx_path.split({system.path.delimiter}))...}
+        codegen.ecsx_path = csx_path.split({system.path.delimiter})
         codegen.minmal = minmal
         if output != null
             var result = ecs_reg.match(file_name)

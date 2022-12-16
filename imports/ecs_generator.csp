@@ -25,7 +25,7 @@
 package ecs_generator
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 9"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 10"
     constant std_version = "210604"
 end
 
@@ -54,7 +54,7 @@ class generator
     var file_name = new string
     var code_buff = new array
     var ecsx_hook = new hash_map
-    var ecsx_path = {"."}
+    var ecsx_path = new array
     var target = system.out
     var is_package = false
     var stack = new array
@@ -118,10 +118,8 @@ class generator
     end
     function find_ecsx(name)
         var ecsx_search = ecsx_path
-        var csp_import = system.getenv("CS_IMPORT_PATH")
-        if csp_import != null
-            foreach it in csp_import.split({system.path.delimiter}) do ecsx_search.push_back(it)
-        end
+        var csp_import = runtime.get_import_path()
+        foreach it in csp_import.split({system.path.delimiter}) do ecsx_search.push_back(it)
         foreach path in ecsx_search
             var full = path + system.path.separator + name + ".ecsx"
             if system.file.exist(full)
