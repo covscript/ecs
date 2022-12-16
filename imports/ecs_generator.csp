@@ -24,8 +24,23 @@
 
 package ecs_generator
 
+# Version Schema:
+#   1 . 0 . 0 [Version Code](Preview/Unstable/Stable) Build YYMMXX
+#   |   |   |                           |                  |
+#   |   | Minor                       State        Fixed Width Version
+#   | Major
+# Master
+#
+# Short Version Schema:
+#   1 . 0 . 0 a/b/r - YYMMXX
+#   |   |   |   |       |
+#   |   |   | State    FWV
+#   |   | Minor
+#   | Major
+# Master
+
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 10"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 221201"
     constant std_version = "210604"
 end
 
