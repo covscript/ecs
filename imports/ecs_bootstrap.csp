@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.3.5"
+var wrapper_ver = "1.3.6"
 
 function show_version()
 @begin
@@ -43,14 +43,16 @@ function show_help()
         "Usage: ecs [options...] <FILE> [arguments...]\n\n" +
         "Options:\n" +
         "    Option    Function\n" +
-        "   -h         Show help information\n" +
-        "   -v         Show version infomation\n" +
-        "   -f         Disable compile cache\n" +
-        "   -m         Disable beautify\n" +
-        "   -c         Check grammar only\n" +
-        "   -i <PATH>  Set import path\n" +
-        "   -o <PATH>  Set output path\n" +
-        "   -- <ARGS>  Pass parameters to CovScript\n"
+        "   -h            Show help information\n" +
+        "   -v            Show version infomation\n" +
+        "   -f            Disable compile cache\n" +
+        "   -m            Disable beautify\n" +
+        "   -c            Check grammar only\n" +
+        "   -u <CHARSET>  Set unicode charset\n" +
+        "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
+        "   -i <PATH>     Set import path\n" +
+        "   -o <PATH>     Set output path\n" +
+        "   -- <ARGS>     Pass parameters to CovScript\n"
     )
 @end
     system.exit(0)
@@ -60,6 +62,7 @@ var compiler_args = new string
 var file_name = new string
 var arguments = new string
 var csx_path = new string
+var unicode = null
 var no_hash = false
 var minmal = false
 var no_run = false
@@ -87,6 +90,13 @@ function process_args(cmd_args)
             end
             case "-c"
                 no_run = true
+            end
+            case "-u"
+                if index == cmd_args.size - 1
+                    system.out.println("Error: Option \"-u\" not completed. Usage: \"ecs -u <CHARSET>\"")
+                    system.exit(0)
+                end
+                unicode = cmd_args[++index]
             end
             case "-i"
                 if index == cmd_args.size - 1
@@ -122,6 +132,13 @@ function process_args(cmd_args)
     end
 end
 
+@begin
+var codecvt_map = {
+    "UTF8": ([](unicode)->new unicode.codecvt.utf8),
+    "GBK": ([](unicode)->new unicode.codecvt.gbk)
+}.to_hash_map()
+@end
+
 var ecs_reg = regex.build("^(.*)\\.ecs$")
 var lcs_reg = regex.build("^(.*)\\.(csc|csp)$")
 
@@ -151,6 +168,22 @@ function main(cmd_args)
         end
     end
     var parser = new parsergen.generator
+    if unicode != null
+        parser.add_grammar("ecs-lang", ecs_parser.grammar)
+        var unicode_ext = context.import(runtime.get_import_path(), "unicode")
+        if unicode_ext == null
+            system.out.println("Error: unicode extension not installed yet.")
+            system.out.println("Run \'cspkg install extension --yes\' to enable unicode support.")
+            system.exit(0)
+        end
+        var cvt_name = unicode.toupper()
+        if !codecvt_map.exist(cvt_name)
+            system.out.println("Error: unknown unicode charset \"" + cvt_name + "\".")
+            system.exit(0)
+        end
+        parser.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
+        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)))
+    end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
     if parser.ast != null
@@ -163,6 +196,9 @@ function main(cmd_args)
         codegen.file_name = file_name
         codegen.ecsx_path = csx_path.split({system.path.delimiter})
         codegen.minmal = minmal
+        if unicode != null
+            codegen.custom_header.push_back("@charset: " + unicode.tolower())
+        end
         if output != null
             var result = ecs_reg.match(file_name)
             if !result.empty()

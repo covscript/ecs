@@ -1,11 +1,12 @@
-# Covariant Script Parser Generator v1.2.6 Release
-# Release Date: Fri Sep 16 10:47:53 2022
+# Covariant Script Parser Generator v1.3.0 Release
+# Release Date: Sat Jan  7 23:10:52 2023
 # Copyright (C) 2017-2022 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
 @require: 210503
 package parsergen
 import regex
+var unicode = context.import(runtime.get_import_path(), "unicode")
 struct syntax_impl
     var boot = null
     var type = null
@@ -148,6 +149,105 @@ class lexer_type
                 cursor_forward()
             else
                 var nbuff = buff + ch
+                var nset = new hash_set
+                foreach it in lexical_set
+                    if lexical[it].match(nbuff).empty()
+                        nset.insert(it)
+                    end
+                end
+                nset = hash_set.subtract(lexical_set, nset)
+                if nset.empty()
+                    process_token()
+                    lexical_set = new hash_set
+                else
+                    lexical_set = nset
+                    buff = nbuff
+                    cursor_forward()
+                end
+            end
+        end
+        process_token()
+        return output
+    end
+end
+class unicode_lexer_type
+    var lexical_set = new hash_set
+    var error_log = new array
+    var output = new array
+    var buff = null
+    var data = null
+    var wpos = {0, 0}
+    var pos = {0, 0, 0}
+    var cvt = null
+    function initialize()
+        if unicode == null
+            throw runtime.exception("Please install unicode package first!")
+        end
+        buff = new unicode.wstring
+        cvt = new unicode.codecvt.utf8
+    end
+    function cursor_forward()
+        ++pos[2]
+        if pos[2] != data.size()
+            if data.at(pos[2]) == unicode.wchar.from_char('\n')
+                ++pos[1]
+                pos[0] = 0
+            else
+                ++pos[0]
+            end
+        end
+    end
+    function error(str, pos)
+        var err = new lex_error
+        err.text = str
+        err.pos = pos
+        --err.pos[0]
+        error_log.push_back(move(err))
+    end
+    function process_token()
+        if lexical_set.size > 1
+            if lexical_set.exist("err")
+                error("Unexpected input \"" + cvt.wide2local(buff) + "\"", wpos)
+                lexical_set = new hash_set
+                return
+            else
+                if lexical_set.exist("ign")
+                    lexical_set.erase("ign")
+                end
+                if lexical_set.size > 1
+                    error("Ambiguous lexical \"" + cvt.wide2local(buff) + "\"", wpos)
+                    lexical_set = new hash_set
+                    return
+                end
+            end
+        end
+        var rule = null
+        foreach it in lexical_set do rule = it
+        if rule != "ign"
+            output.push_back(make_token(wpos, rule, cvt.wide2local(buff)))
+        end
+    end
+    function run(lexical, text)
+        data = cvt.local2wide(text)
+        while pos[2] != data.size()
+            var ch = data.at(pos[2])
+            if lexical_set.empty()
+                var nbuff = ch.to_wstring()
+                foreach it in lexical
+                    if !it.second.match(nbuff).empty()
+                        lexical_set.insert(it.first)
+                    end
+                end
+                if !lexical_set.empty()
+                    wpos = pos
+                    buff = nbuff
+                else
+                    error("Unknown character \'" + cvt.wide2local(nbuff) + "\'", pos)
+                end
+                cursor_forward()
+            else
+                var nbuff = buff
+                nbuff.append(ch.to_wstring())
                 var nset = new hash_set
                 foreach it in lexical_set
                     if lexical[it].match(nbuff).empty()
@@ -692,11 +792,17 @@ class generator
     var lexer = null
     var parser = null
     var stop_on_error = true
+    var unicode_cvt = null
     var enable_log = false
     var file_path = "<FILE>"
     function priv_run(lang)
         if rules.exist(lang)
-            lexer = new lexer_type
+            if unicode_cvt != null
+                lexer = new unicode_lexer_type
+                lexer.cvt = unicode_cvt
+            else
+                lexer = new lexer_type
+            end
             if rules[lang].lex == null
                 print_header("Lexical rules not found! Stop")
                 return false

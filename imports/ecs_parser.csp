@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.3
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,22 +24,24 @@ import parsergen, regex
 
 constant syntax = parsergen.syntax
 
-@begin
-var covscript_lexical = {
-    "endl" : regex.build("^\\n+$"),
-    "id" : regex.build("^[A-Za-z_]\\w*$"),
-    "num" : regex.build("^[0-9]+\\.?([0-9]+)?$"),
-    "str" : regex.build("^(\"|\"([^\"]|\\\\\")*\"?)$"),
-    "char" : regex.build("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
-    "bsig" : regex.build("^(;|:=?|::|\\?|\\.\\.?|\\.\\.\\.)$"),
-    "msig" : regex.build("^(\\+(\\+|=)?|-(-|=|>)?|\\*=?|/=?|%=?|\\^=?)$"),
-    "lsig" : regex.build("^(>|<|&|(\\|)|&&|(\\|\\|)|!|==?|!=?|>=?|<=?)$"),
-    "brac" : regex.build("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
-    "prep" : regex.build("^@.*$"),
-    "ign" : regex.build("^([ \\f\\r\\t\\v]+|#.*)$"),
-    "err" : regex.build("^(\"|\'|(\\|)|\\.\\.)$")
-}.to_hash_map()
-@end
+function get_lexical(reg_builder)
+    @begin
+    return {
+        "endl" : reg_builder("^\\n+$"),
+        "id" :   reg_builder("^[A-Za-z_]\\w*$"),
+        "num" :  reg_builder("^[0-9]+\\.?([0-9]+)?$"),
+        "str" :  reg_builder("^(\"|\"([^\"]|\\\\\")*\"?)$"),
+        "char" : reg_builder("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
+        "bsig" : reg_builder("^(;|:=?|::|\\?|\\.\\.?|\\.\\.\\.)$"),
+        "msig" : reg_builder("^(\\+(\\+|=)?|-(-|=|>)?|\\*=?|/=?|%=?|\\^=?)$"),
+        "lsig" : reg_builder("^(>|<|&|(\\|)|&&|(\\|\\|)|!|==?|!=?|>=?|<=?)$"),
+        "brac" : reg_builder("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
+        "prep" : reg_builder("^@.*$"),
+        "ign" :  reg_builder("^([ \\f\\r\\t\\v]+|#.*)$"),
+        "err" :  reg_builder("^(\"|\'|(\\|)|\\.\\.)$")
+    }.to_hash_map()
+    @end
+end
 
 @begin
 var covscript_syntax = {
@@ -338,6 +340,6 @@ var covscript_syntax = {
 @end
 
 var grammar = new parsergen.grammar
-grammar.lex = covscript_lexical
+grammar.lex = get_lexical(regex.build)
 grammar.stx = covscript_syntax
 grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
