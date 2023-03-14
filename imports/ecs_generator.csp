@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230101"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230301"
     constant std_version = "210604"
 end
 
@@ -73,6 +73,7 @@ class generator
     var ecsx_path = new array
     var target = system.out
     var is_package = false
+    var ecs_prefix = ""
     var stack = new array
     var slice_ext = false
     var minmal = false
@@ -653,12 +654,12 @@ class generator
                         if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
                             matched = true
                             # Visit term "new"
-                            ++idx; target.print("ecs.param_new(")
+                            ++idx; target.print(ecs_prefix + "ecs.param_new(")
                         end
                         if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
                             matched = true
                             # Visit term "gcnew"
-                            ++idx; target.print("ecs.param_gcnew(")
+                            ++idx; target.print(ecs_prefix + "ecs.param_gcnew(")
                         end
                         if !matched
                             # Error
@@ -821,7 +822,7 @@ class generator
         # Recursive Visit lambda-body
         this.visit_lambda_body(nodes[idx++].nodes)
         lambda_list.push_back(stack.front)
-        target.print("ecs.init_lambda(global.__ecs_lambda_impl_" + lambda_list.size + "__")
+        target.print(ecs_prefix + "ecs.init_lambda(global.__" + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size + "__")
         var capture_str = ", "
         foreach it in stack.front.capture_list
             capture_str += it.first + ", "
@@ -1238,7 +1239,7 @@ class generator
                 ++idx; target.print(" = ")
                 # Optional
                 if nodes.size > 3 && (typeid nodes[3] == typeid parsergen.syntax_tree && nodes[3].root == "array")
-                    target.print("ecs.param_new(")
+                    target.print(ecs_prefix + "ecs.param_new(")
                     # Recursive Visit unary-expr
                     this.visit_unary_expr(nodes[idx++].nodes)
                     target.print(", ")
@@ -1738,7 +1739,7 @@ class generator
         ++idx; target.print("throw ")
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "expr")
-            target.print("ecs.throw_exception(")
+            target.print(ecs_prefix + "ecs.throw_exception(")
             # Recursive Visit expr
             this.visit_expr(nodes[idx++].nodes)
             target.print(")")
@@ -1812,9 +1813,9 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(dat.type)
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println("if !__ecs_catch__ && ecs.type_validator.__" + type_id + "(ecs.current_except)")
+                    target.println("if !__ecs_catch__ && " + ecs_prefix + "ecs.type_validator.__" + type_id + "(" + ecs_prefix + "ecs.current_except)")
                 else
-                    target.print("if !__ecs_catch__ && typeid ecs.current_except == typeid(")
+                    target.print("if !__ecs_catch__ && typeid " + ecs_prefix + "ecs.current_except == typeid(")
                     this.visit_visit_expr(dat.type)
                     target.println(")")
                 end
@@ -1823,7 +1824,7 @@ class generator
             print_indent()
             target.println("__ecs_catch__ = true")
             print_indent()
-            target.println("var " + dat.id + " = ecs.get_exception()")
+            target.println("var " + dat.id + " = " + ecs_prefix + "ecs.get_exception()")
             --indent
             this.visit_stmts(dat.body)
             print_indent()
@@ -1881,9 +1882,9 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(map["check-type"])
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println("ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", ecs.type_validator.__" + type_id + ")")
+                    target.println(ecs_prefix + "ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")")
                 else
-                    target.print("ecs.check_type(\"" + stack.front.first + "\", " + stack.front.first + ", ")
+                    target.print(ecs_prefix + "ecs.check_type(\"" + stack.front.first + "\", " + stack.front.first + ", ")
                     this.visit_visit_expr(map["check-type"])
                     target.println(")")
                 end
@@ -2013,7 +2014,9 @@ class generator
         # Visit term "package"
         ++idx; target.print("package ")
         # Visit id token
-        target.print(nodes[idx++].data)
+        var id = nodes[idx++].data
+        ecs_prefix = id + "_"
+        target.print(id)
         # Recursive Visit endline
         this.visit_endline(nodes[idx++].nodes)
     end
@@ -2034,7 +2037,7 @@ class generator
                 if nodes[1].data == "not"
                     target.print("!")
                 end
-                target.print("ecs.type_validator.__" + type_id + "(")
+                target.print(ecs_prefix + "ecs.type_validator.__" + type_id + "(")
                 this.visit_relat_expr(nodes[0].nodes)
                 target.print(")")
             else
@@ -2216,13 +2219,17 @@ class generator
         foreach it in custom_header
             target.println(it)
         end
-        target.println("import ecs")
+        if is_package
+            target.println("import ecs as " + ecs_prefix + "ecs")
+        else
+            target.println("import ecs")
+        end
         if slice_ext
-            target.println("import sdk_extension as __ecs_sdk")
-            target.println("__ecs_sdk.extend_type(array, \"ecs_slice_ext\", ecs.ecs_slice_ext)")
+            target.println("import sdk_extension as " + ecs_prefix + "ecs_sdk")
+            target.println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)")
         end
         for i = 0, i < lambda_list.size, ++i
-            target.println("struct __ecs_lambda_impl_" + to_string(i + 1) + "__")
+            target.println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(i + 1) + "__")
             indent = 1
             link dat = lambda_list[i]
             foreach it in dat.capture_list
@@ -2280,9 +2287,9 @@ class generator
                     print_indent()
                     var type_id = get_id_of_visit_expr(map["check-type"])
                     if type_id != null && ecs.special_type.exist(type_id)
-                        target.println("ecs.check_type_s(\"" + it.first + "\", " + it.first + ", ecs.type_validator.__" + type_id + ")")
+                        target.println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")")
                     else
-                        target.print("ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
+                        target.print(ecs_prefix + "ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
                         this.visit_visit_expr(map["check-type"])
                         target.println(")")
                     end
