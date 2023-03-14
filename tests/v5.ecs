@@ -1,7 +1,9 @@
 package v5
 
-var (a, b, c) = {1, 2, 3}
+var (a, b, ..., c) = {1, 2, 3, 4}
 
 var fun = [a, c](b){
     return 4*a*b + c
 }
+
+system.out.println(fun(b))

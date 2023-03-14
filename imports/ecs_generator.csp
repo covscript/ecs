@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230301"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230302"
     constant std_version = "210604"
 end
 
@@ -73,6 +73,7 @@ class generator
     var ecsx_path = new array
     var target = system.out
     var is_package = false
+    var ecs_discard = 0
     var ecs_prefix = ""
     var stack = new array
     var slice_ext = false
@@ -128,6 +129,9 @@ class generator
             end
         end
         return null
+    end
+    function gen_unique_discard_id()
+        return "__ecs_discard_" + ecs_prefix + to_string(++ecs_discard) + "__"
     end
     function register_ecsx(path, hook)
         var ecsx = context.source_import(path)
@@ -416,10 +420,10 @@ class generator
                 # Visit id token
                 target.print(nodes[idx++].data)
             end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "...")
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "...")
                 matched = true
                 # Visit ... token
-                target.print(nodes[idx++].data)
+                target.print(gen_unique_discard_id())
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-bind")
                 matched = true
