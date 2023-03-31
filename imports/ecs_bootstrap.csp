@@ -212,7 +212,7 @@ function main(cmd_args)
                 var target_name = codegen.run(name, parser.ast)
                 if csym
                     var csym_ofs = iostream.ofstream(name + ".csym")
-                    var dbg_info = "#$CSYM:"
+                    var dbg_info = "#$cSYM/1.0(" + target_name + "):"
                     foreach it in codegen.dbg_line_map do dbg_info += it + ","
                     dbg_info.cut(1)
                     csym_ofs.println(dbg_info)
@@ -229,7 +229,7 @@ function main(cmd_args)
             var target_name = codegen.run(name, parser.ast)
             if csym
                 var csym_ofs = iostream.ofstream(name + ".csym")
-                var dbg_info = "#$CSYM:"
+                var dbg_info = "#$cSYM/1.0(" + target_name + "):"
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
                 dbg_info.cut(1)
                 csym_ofs.println(dbg_info)
