@@ -55,6 +55,7 @@ struct lambda_type
     var argument_list = null
     var body_stmts = null
     var body_expr = null
+    var pos = {0, 0}
 end
 
 struct catch_type
@@ -808,6 +809,7 @@ class generator
     function visit_lambda_expr(nodes)
         var idx = 0
         stack.push_front(new lambda_type)
+        stack.front.pos = nodes.front.pos
         # Visit term "["
         ++idx
         # Optional
@@ -2247,12 +2249,12 @@ class generator
             println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)", null)
         end
         for i = 0, i < lambda_list.size, ++i
-            println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(i + 1) + "__", null)
             indent = 1
             link dat = lambda_list[i]
+            println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(i + 1) + "__", dat.pos)
             foreach it in dat.capture_list
                 print_indent()
-                println("var " + it.first + " = null", null)
+                println("var " + it.first + " = null", dat.pos)
             end
             print_indent()
             target.print("function construct(")
@@ -2264,19 +2266,19 @@ class generator
                 str.cut(2)
                 target.print(str)
             end
-            println(")", null)
+            println(")", dat.pos)
             ++indent
             foreach it in dat.capture_list
                 print_indent()
                 if it.second
-                    println("this." + it.first + " = _" + it.first, null)
+                    println("this." + it.first + " = _" + it.first, dat.pos)
                 else
-                    println("this." + it.first + " := _" + it.first, null)
+                    println("this." + it.first + " := _" + it.first, dat.pos)
                 end
             end
             --indent
             print_indent()
-            println("end", null)
+            println("end", dat.pos)
             print_indent()
             target.print("function call(")
             if !dat.argument_list.empty()
@@ -2291,25 +2293,25 @@ class generator
                 str.cut(2)
                 target.print(str)
             end
-            println(")", null)
+            println(")", dat.pos)
             ++indent
             print_indent()
-            println("link self = this.call", null)
+            println("link self = this.call", dat.pos)
             foreach it in dat.argument_list
                 link map = it.second
                 if map.exist("pass-by-value")
                     print_indent()
-                    println(it.first + " := clone(" + it.first + ")", null)
+                    println(it.first + " := clone(" + it.first + ")", dat.pos)
                 end
                 if map.exist("check-type")
                     print_indent()
                     var type_id = get_id_of_visit_expr(map["check-type"])
                     if type_id != null && ecs.special_type.exist(type_id)
-                        println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", null)
+                        println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", dat.pos)
                     else
                         target.print(ecs_prefix + "ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
                         this.visit_visit_expr(map["check-type"])
-                        println(")", null)
+                        println(")", dat.pos)
                     end
                 end
             end
@@ -2322,12 +2324,12 @@ class generator
                 print_indent()
                 target.print("return ")
                 this.visit_cond_expr(dat.body_expr)
-                println("", null)
+                println("", dat.pos)
             end
             --indent
             print_indent()
-            println("end", null)
-            println("end", null)
+            println("end", dat.pos)
+            println("end", dat.pos)
         end
         target.print(buff)
         foreach it in file_dbg_info do dbg_line_map.push_back(it)

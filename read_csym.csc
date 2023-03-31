@@ -65,7 +65,12 @@ function alignment(str)
 end
 
 var file = context.cmd_args[1]
-var csc_source = read_file(file + ".csc")
+var csc_source = null
+if system.file.exist(file + ".csc")
+    csc_source = read_file(file + ".csc")
+else
+    csc_source = read_file(file + ".csp")
+end
 var (csym, ecs_source) = read_csym(file + ".csym")
 foreach i in range(csc_source.size)
     if csym[i] == "-"
