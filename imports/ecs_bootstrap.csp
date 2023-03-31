@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.4.0
+# Bootstrap of Extended Covariant Script Generator v1.4.1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.4.0"
+var wrapper_ver = "1.4.1"
 
 function show_version()
 @begin
@@ -62,7 +62,7 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
-var csx_path = new string
+var csx_path = null
 var unicode = null
 var no_hash = false
 var minmal = false
@@ -153,6 +153,20 @@ function match(reg, str)
     return !reg.match(str).empty()
 end
 
+function process_path(str)
+    if system.is_platform_windows()
+        var s = str
+        foreach i in range(s.size)
+            if s[i] == '/'
+                s.assign(i, '\\')
+            end
+        end
+        return move(s)
+    else
+        return str
+    end
+end
+
 function main(cmd_args)
     process_args(cmd_args)
     if !system.file.exist(file_name) || !match(regex.build(ecs_parser.grammar.ext), file_name)
@@ -169,7 +183,7 @@ function main(cmd_args)
                 var name = ifs.getline()
                 var mtime = ifs.getline().to_number()
                 if mtime == system.file.mtime(file_name)
-                    system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+                    system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + name + arguments)))
                 end
             end
         end
@@ -195,13 +209,18 @@ function main(cmd_args)
     parser.from_file(file_name)
     if parser.ast != null
         if match(lcs_reg, file_name)
-            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + file_name + arguments))
+            if csx_path != null
+                compiler_args += " -i " + csx_path
+            end
+            system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + file_name + arguments)))
         end
         var codegen = new ecs_generator.generator
-        compiler_args += " -i \"" + csx_path + "\""
+        if csx_path != null
+            compiler_args += " -i " + csx_path
+            codegen.ecsx_path = csx_path.split({system.path.delimiter})
+        end
         codegen.code_buff = parser.code_buff
         codegen.file_name = file_name
-        codegen.ecsx_path = csx_path.split({system.path.delimiter})
         codegen.minmal = minmal
         if unicode != null
             codegen.custom_header.push_back("@charset: " + unicode.tolower())
@@ -222,14 +241,14 @@ function main(cmd_args)
                 if !no_hash
                     iostream.ofstream("./.ecs_output/" + file_hash).println(target_name)
                 end
-                system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + target_name + arguments))
+                system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + target_name + arguments)))
             end
         else
             system.path.mkdir_p("./.ecs_output/")
             var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
             var target_name = codegen.run(name, parser.ast)
             if csym
-                compiler_args += " -g \"" + name + ".csym\""
+                compiler_args += " -g " + name + ".csym"
                 var csym_ofs = iostream.ofstream(name + ".csym")
                 var dbg_info = "#$cSYM/1.0(" + file_name + "):"
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
@@ -242,7 +261,7 @@ function main(cmd_args)
                 ofs.println(target_name)
                 ofs.println(system.file.mtime(file_name))
             end
-            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + target_name + arguments))
+            system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + target_name + arguments)))
         end
     end
 end
