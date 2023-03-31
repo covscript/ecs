@@ -1,5 +1,5 @@
-# Covariant Script Parser Generator v1.3.0 Release
-# Release Date: Sat Jan  7 23:10:52 2023
+# Covariant Script Parser Generator v1.3.1 Release
+# Release Date: Fri Mar 31 23:43:24 2023
 # Copyright (C) 2017-2023 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
@@ -586,6 +586,7 @@ class parser_type
                 end
             end
             case syntax_type.cond
+                var reaches_eof = false
                 foreach seq in it.data
                     var result = predict(seq.boot)
                     switch result
@@ -607,12 +608,12 @@ class parser_type
                             pop_stage()
                         end
                         case parse_state.eof
+                            reaches_eof = true
                             pop_stage()
-                            return parse_state.eof
                         end
                     end
                 end
-                return parse_state.reject
+                return reaches_eof ? parse_state.eof : parse_state.reject
             end
         end
         return parse_state.reject
@@ -783,6 +784,36 @@ end
 function print_ast(tree)
     print_ast_impl(0, tree)
 end
+function read_stream(ifs, data)
+    var line = new string
+    var expect_n = false
+    loop
+        var ch = ifs.get()
+        if ifs.good() && !ifs.eof()
+            if expect_n
+                expect_n = false
+                if ch != '\n'
+                    line += '\r'
+                end
+            end
+            if ch == '\n'
+                data.push_back(line)
+                line = new string
+                continue
+            end
+            if ch == '\r'
+                expect_n = true
+                continue
+            end
+            line += ch
+        else
+            break
+        end
+    end
+    if !line.empty()
+        data.push_back(line)
+    end
+end
 class generator
     var rules = new hash_map
     var input = new string
@@ -850,16 +881,16 @@ class generator
         file_path = path
         input = new string
         code_buff = new array
-        while ifs.good()
-            var line = ifs.getline()
+        read_stream(ifs, code_buff)
+        foreach line in code_buff
             input += line + "\n"
             for i = 0, i < line.size, ++i
                 if line[i] == '\t'
                     line.assign(i, ' ')
                 end
             end
-            code_buff.push_back(line)
         end
+        code_buff.push_back("")
         foreach it in rules
             var reg = regex.build(it.second.ext)
             if !reg.match(path).empty()
