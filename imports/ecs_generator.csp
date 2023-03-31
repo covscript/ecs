@@ -59,7 +59,7 @@ end
 
 struct catch_type
     var id = null
-    var pos = null
+    var pos = {0, 0}
     var type = null
     var body = null
 end
