@@ -1828,36 +1828,36 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(dat.type)
                 if type_id != null && ecs.special_type.exist(type_id)
-                    println("if !__ecs_catch__ && " + ecs_prefix + "ecs.type_validator.__" + type_id + "(" + ecs_prefix + "ecs.current_except)", nodes.front.pos)
+                    println("if !__ecs_catch__ && " + ecs_prefix + "ecs.type_validator.__" + type_id + "(" + ecs_prefix + "ecs.current_except)", dat.pos)
                 else
                     target.print("if !__ecs_catch__ && typeid " + ecs_prefix + "ecs.current_except == typeid(")
                     this.visit_visit_expr(dat.type)
-                    println(")", nodes.front.pos)
+                    println(")", dat.pos)
                 end
             end
             ++indent
             print_indent()
-            println("__ecs_catch__ = true", nodes.front.pos)
+            println("__ecs_catch__ = true", dat.pos)
             print_indent()
-            println("var " + dat.id + " = " + ecs_prefix + "ecs.get_exception()", nodes.front.pos)
+            println("var " + dat.id + " = " + ecs_prefix + "ecs.get_exception()", dat.pos)
             --indent
             this.visit_stmts(dat.body)
             print_indent()
-            println("end", nodes.front.pos)
+            println("end", dat.pos)
         end
         --indent
         print_indent()
         println("end", nodes.front.pos)
         if default_catch != null
             print_indent()
-            println("if !__ecs_catch__", nodes.front.pos)
+            println("if !__ecs_catch__", default_catch.pos)
             ++indent
             print_indent()
-            println("link " + default_catch.id + " = __ecs_except__", nodes.front.pos)
+            println("link " + default_catch.id + " = __ecs_except__", default_catch.pos)
             --indent
             this.visit_stmts(default_catch.body)
             print_indent()
-            println("end", nodes.front.pos)
+            println("end", default_catch.pos)
         end
         --indent
         # Visit term "end"
