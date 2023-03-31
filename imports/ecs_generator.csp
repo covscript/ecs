@@ -1743,7 +1743,7 @@ class generator
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
-            ++idx; println("", nodes.front.pos)
+            ++idx; println("", nodes[idx - 1].pos)
             # Recursive Visit import-list
             this.visit_import_list(nodes[idx++].nodes)
         end
@@ -1780,7 +1780,7 @@ class generator
                 if minmal
                     ++idx; target.print(";")
                 else
-                    ++idx; println("", {0, nodes.front.pos[1] - 1})
+                    ++idx; println("", nodes.front.pos)
                 end
             end
             if !matched
