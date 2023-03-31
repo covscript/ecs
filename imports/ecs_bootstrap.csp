@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.3.8
+# Bootstrap of Extended Covariant Script Generator v1.4.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.3.8"
+var wrapper_ver = "1.4.0"
 
 function show_version()
 @begin
@@ -94,6 +94,7 @@ function process_args(cmd_args)
                 no_run = true
             end
             case "-g"
+                no_hash = true
                 csym = true
             end
             case "-u"
@@ -228,6 +229,7 @@ function main(cmd_args)
             var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
             var target_name = codegen.run(name, parser.ast)
             if csym
+                compiler_args += " -g \"" + name + ".csym\""
                 var csym_ofs = iostream.ofstream(name + ".csym")
                 var dbg_info = "#$cSYM/1.0(" + file_name + "):"
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
