@@ -1,25 +1,42 @@
 function read_file(path)
     var ifs = iostream.ifstream(path)
-    var data = new string
+    var line = new string
+    var data = new array
+    var expect_n = false
     loop
         var ch = ifs.get()
         if ifs.good() && !ifs.eof()
-            data += ch
+            if expect_n
+                expect_n = false
+                if ch != '\n'
+                    line += '\r'
+                end
+            end
+            if ch == '\n'
+                data.push_back(line)
+                line = new string
+                continue
+            end
+            if ch == '\r'
+                expect_n = true
+                continue
+            end
+            line += ch
         else
             break
         end
+    end
+    if !line.empty()
+        data.push_back(line)
     end
     return move(data)
 end
 
 var file = context.cmd_args[1]
-var ecs_source = read_file("./tests/" + file + ".ecs").split({'\n'})
-var csc_source = read_file(file + ".csc").split({'\n'})
-var csym = read_file(file + ".csym").split({'\n'})
+var ecs_source = read_file("./tests/" + file + ".ecs")
+var csc_source = read_file(file + ".csc")
+var csym = read_file(file + ".csym")
 foreach i in range(csc_source.size)
-    if csym[i][-1] == 'r'
-        csym[i].pop_back()
-    end
     if csym[i] == "INTERNAL"
         continue
     end
