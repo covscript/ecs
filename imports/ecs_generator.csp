@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230303"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230304"
     constant std_version = "210604"
 end
 
@@ -504,9 +504,9 @@ class generator
             this.visit_basic_expr(nodes[idx++].nodes)
         end
         # Recursive Visit for-body
-        this.visit_for_body(nodes[idx++].nodes)
+        this.visit_for_body(nodes[idx++].nodes, nodes.front.pos)
     end
-    function visit_for_body(nodes)
+    function visit_for_body(nodes, header_pos)
         var idx = 0
         # Condition
         block
@@ -523,7 +523,7 @@ class generator
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
                 matched = true
                 # Visit endl token
-                ++idx; println("", nodes[idx - 1].pos)
+                ++idx; println("", header_pos)
                 # Recursive Visit stmts
                 this.visit_stmts(nodes[idx++].nodes)
                 # Visit term "end"
@@ -1340,7 +1340,7 @@ class generator
         # Recursive Visit basic-expr
         this.visit_basic_expr(nodes[idx++].nodes)
         # Recursive Visit for-body
-        this.visit_for_body(nodes[idx++].nodes)
+        this.visit_for_body(nodes[idx++].nodes, nodes.front.pos)
     end
     function visit_var_stmt(nodes)
         var idx = 0

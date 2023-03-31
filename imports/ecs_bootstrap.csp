@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.3.7
+# Bootstrap of Extended Covariant Script Generator v1.3.8
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.3.7"
+var wrapper_ver = "1.3.8"
 
 function show_version()
 @begin
@@ -212,7 +212,7 @@ function main(cmd_args)
                 var target_name = codegen.run(name, parser.ast)
                 if csym
                     var csym_ofs = iostream.ofstream(name + ".csym")
-                    var dbg_info = "#$cSYM/1.0(" + target_name + "):"
+                    var dbg_info = "#$cSYM/1.0(" + file_name + "):"
                     foreach it in codegen.dbg_line_map do dbg_info += it + ","
                     dbg_info.cut(1)
                     csym_ofs.println(dbg_info)
@@ -229,7 +229,7 @@ function main(cmd_args)
             var target_name = codegen.run(name, parser.ast)
             if csym
                 var csym_ofs = iostream.ofstream(name + ".csym")
-                var dbg_info = "#$cSYM/1.0(" + target_name + "):"
+                var dbg_info = "#$cSYM/1.0(" + file_name + "):"
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
                 dbg_info.cut(1)
                 csym_ofs.println(dbg_info)
