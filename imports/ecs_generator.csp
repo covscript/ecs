@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230302"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230303"
     constant std_version = "210604"
 end
 
@@ -59,7 +59,7 @@ end
 
 struct catch_type
     var id = null
-    var pos = {0, 0}
+    var pos = null
     var type = null
     var body = null
 end
@@ -79,6 +79,17 @@ class generator
     var slice_ext = false
     var minmal = false
     var indent = -1
+    # Debug Info
+    var gen_dbg_info = false
+    var dbg_line_map = new array
+    function println(str, pos)
+        target.println(str)
+        if pos == null
+            dbg_line_map.push_back("INTERNAL")
+        else
+            dbg_line_map.push_back(pos[1])
+        end
+    end
     function error(pos, text)
         var err = new parsergen.lex_error
         err.text = text
@@ -240,12 +251,12 @@ class generator
         # Visit term "block"
         ++idx; target.print("block ")
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_endblock(nodes)
         var idx = 0
@@ -511,12 +522,12 @@ class generator
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
                 matched = true
                 # Visit endl token
-                ++idx; target.println("")
+                ++idx; println("", nodes[idx - 1].pos)
                 # Recursive Visit stmts
                 this.visit_stmts(nodes[idx++].nodes)
                 # Visit term "end"
                 print_indent()
-                target.println("end")
+                println("end", {0, nodes.back.pos[1] - 1})
             end
             if !matched
             	# Error
@@ -554,12 +565,12 @@ class generator
             this.visit_visit_expr(nodes[idx++].nodes)
         end
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit decl-stmts
         this.visit_decl_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_single_expr(nodes)
         var idx = 0
@@ -622,7 +633,7 @@ class generator
         var idx = 0
         # Visit term "else"
         print_indent()
-        ++idx; target.println("else")
+        ++idx; println("else", nodes.front.pos)
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "if")
             stack.push_front("elif")
@@ -633,7 +644,7 @@ class generator
             # Recursive Visit basic-expr
             this.visit_basic_expr(nodes[idx++].nodes)
             # Visit endl token
-            target.println("")
+            println("", {0, nodes.back.pos[1] - 1})
         end
     end
     function visit_unary_expr(nodes)
@@ -985,14 +996,14 @@ class generator
                         end
                     end
                     if require_ver <= ecs_info.std_version
-                        target.println("@require: 210503")
+                        println("@require: 210503", nodes.front.pos)
                         return
                     else
                         error(nodes.front.pos, "Newer Language Standard required: " + require_ver + ", now on " + ecs_info.std_version)
                     end
                 end
             end
-            target.println(prep)
+            println(prep, nodes.front.pos)
         end
     end
     function visit_argument_list(nodes, print)
@@ -1277,7 +1288,7 @@ class generator
         # Recursive Visit basic-expr
         this.visit_basic_expr(nodes[idx++].nodes)
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         # Repeat
@@ -1290,13 +1301,13 @@ class generator
         while !stack.empty() && stack.front == "elif"
             stack.pop_front()
             print_indent()
-            target.println("end")
+            println("end", {0, nodes.back.pos[1] - 1})
             --indent
         end
         stack.pop_front()
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_switch_case(nodes)
         var idx = 0
@@ -1306,12 +1317,12 @@ class generator
         # Recursive Visit logic-or-expr
         this.visit_logic_or_expr(nodes[idx++].nodes)
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_foreach_stmt(nodes)
         var idx = 0
@@ -1503,12 +1514,12 @@ class generator
         # Recursive Visit basic-expr
         this.visit_basic_expr(nodes[idx++].nodes)
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_switch_stmt(nodes)
         var idx = 0
@@ -1517,12 +1528,12 @@ class generator
         # Recursive Visit basic-expr
         this.visit_basic_expr(nodes[idx++].nodes)
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit switch-stmts
         this.visit_switch_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_element(nodes)
         var idx = 0
@@ -1577,12 +1588,12 @@ class generator
         # Visit id token
         target.print(nodes[idx++].data)
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit decl-stmts
         this.visit_decl_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_array(nodes)
         var idx = 0
@@ -1602,12 +1613,12 @@ class generator
         print_indent()
         ++idx; target.print("default")
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_using_list(nodes)
         var idx = 0
@@ -1732,7 +1743,7 @@ class generator
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
-            ++idx; target.println("")
+            ++idx; println("", nodes.front.pos)
             # Recursive Visit import-list
             this.visit_import_list(nodes[idx++].nodes)
         end
@@ -1761,7 +1772,7 @@ class generator
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
                 matched = true
                 # Visit endl token
-                ++idx; target.println("")
+                ++idx; println("", {0, nodes.front.pos[1] - 1})
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ";")
                 matched = true
@@ -1769,7 +1780,7 @@ class generator
                 if minmal
                     ++idx; target.print(";")
                 else
-                    ++idx; target.println("")
+                    ++idx; println("", {0, nodes.front.pos[1] - 1})
                 end
             end
             if !matched
@@ -1783,7 +1794,7 @@ class generator
         # Visit term "try"
         ++idx; target.print("try ")
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         stack.push_front("try")
@@ -1797,13 +1808,13 @@ class generator
             # this.visit_stmts(nodes[idx++].nodes)
         end
         print_indent()
-        target.println("catch __ecs_except__")
+        println("catch __ecs_except__", nodes.front.pos)
         ++indent
         var default_catch = null
         print_indent()
-        target.println("var __ecs_catch__ = false")
+        println("var __ecs_catch__ = false", nodes.front.pos)
         print_indent()
-        target.println("if __ecs_except__.what == \"__ecs_except__\"")
+        println("if __ecs_except__.what == \"__ecs_except__\"", nodes.front.pos)
         ++indent
         while typeid stack.front != typeid string || stack.front != "try"
             var dat = stack.pop_front()
@@ -1817,41 +1828,41 @@ class generator
                 print_indent()
                 var type_id = get_id_of_visit_expr(dat.type)
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println("if !__ecs_catch__ && " + ecs_prefix + "ecs.type_validator.__" + type_id + "(" + ecs_prefix + "ecs.current_except)")
+                    println("if !__ecs_catch__ && " + ecs_prefix + "ecs.type_validator.__" + type_id + "(" + ecs_prefix + "ecs.current_except)", nodes.front.pos)
                 else
                     target.print("if !__ecs_catch__ && typeid " + ecs_prefix + "ecs.current_except == typeid(")
                     this.visit_visit_expr(dat.type)
-                    target.println(")")
+                    println(")", nodes.front.pos)
                 end
             end
             ++indent
             print_indent()
-            target.println("__ecs_catch__ = true")
+            println("__ecs_catch__ = true", nodes.front.pos)
             print_indent()
-            target.println("var " + dat.id + " = " + ecs_prefix + "ecs.get_exception()")
+            println("var " + dat.id + " = " + ecs_prefix + "ecs.get_exception()", nodes.front.pos)
             --indent
             this.visit_stmts(dat.body)
             print_indent()
-            target.println("end")
+            println("end", nodes.front.pos)
         end
         --indent
         print_indent()
-        target.println("end")
+        println("end", nodes.front.pos)
         if default_catch != null
             print_indent()
-            target.println("if !__ecs_catch__")
+            println("if !__ecs_catch__", nodes.front.pos)
             ++indent
             print_indent()
-            target.println("link " + default_catch.id + " = __ecs_except__")
+            println("link " + default_catch.id + " = __ecs_except__", nodes.front.pos)
             --indent
             this.visit_stmts(default_catch.body)
             print_indent()
-            target.println("end")
+            println("end", nodes.front.pos)
         end
         --indent
         # Visit term "end"
         print_indent()
-        target.println("end")
+        println("end", {0, nodes.back.pos[1] - 1})
     end
     function visit_function_stmt(nodes)
         var idx = 0
@@ -1874,23 +1885,23 @@ class generator
             # Visit term "override"
             ++idx; target.print(" override")
         end
-        target.println("")
+        println("", nodes.front.pos)
         ++indent
         while typeid stack.front != typeid string || stack.front != "function"
             link map = stack.front.second
             if map.exist("pass-by-value")
                 print_indent()
-                target.println(stack.front.first + " := clone(" + stack.front.first + ")")
+                println(stack.front.first + " := clone(" + stack.front.first + ")", nodes.front.pos)
             end
             if map.exist("check-type")
                 print_indent()
                 var type_id = get_id_of_visit_expr(map["check-type"])
                 if type_id != null && ecs.special_type.exist(type_id)
-                    target.println(ecs_prefix + "ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")")
+                    println(ecs_prefix + "ecs.check_type_s(\"" + stack.front.first + "\", " + stack.front.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", nodes.front.pos)
                 else
                     target.print(ecs_prefix + "ecs.check_type(\"" + stack.front.first + "\", " + stack.front.first + ", ")
                     this.visit_visit_expr(map["check-type"])
-                    target.println(")")
+                    println(")", nodes.front.pos)
                 end
             end
             stack.pop_front()
@@ -1912,7 +1923,7 @@ class generator
                 # Recursive Visit stmts
                 this.visit_stmts(nodes[idx++].nodes)
                 # Visit term "}"
-                ++idx; target.println("end")
+                ++idx; println("end", {0, nodes.back.pos[1] - 1})
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
                 matched = true
@@ -1922,7 +1933,7 @@ class generator
                 this.visit_stmts(nodes[idx++].nodes)
                 # Visit term "end"
                 print_indent()
-                target.println("end")
+                println("end", {0, nodes.back.pos[1] - 1})
             end
             if !matched
             	# Error
@@ -1935,7 +1946,7 @@ class generator
         # Visit term "loop"
         ++idx; target.print("loop")
         # Visit endl token
-        ++idx; target.println("")
+        ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         print_indent()
@@ -1950,7 +1961,7 @@ class generator
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "end")
                 matched = true
                 # Visit term "end"
-                target.println("end")
+                println("end", {0, nodes.back.pos[1] - 1})
             end
             if !matched
             	# Error
@@ -2031,7 +2042,7 @@ class generator
         # Recursive Visit basic-expr
         this.visit_basic_expr(nodes[idx++].nodes)
         # Visit endl token
-        target.println("")
+        println("", nodes.front.pos)
     end
     function visit_equal_expr(nodes)
         var idx = 0
@@ -2212,33 +2223,36 @@ class generator
         visit_begin(ast.nodes)
         var file_name = name + (is_package ? ".csp" : ".csc")
         target = iostream.ofstream(file_name)
+        var file_dbg_info = dbg_line_map
+        dbg_line_map = new array
         if !is_package
-            target.println("#!/usr/bin/env cs")
+            println("#!/usr/bin/env cs", null)
         end
         if !minmal
-            target.println("# Generated by Extended CovScript Compiler")
-            target.println("# DO NOT MODIFY")
+            println("# Generated by Extended CovScript Compiler", null)
+            println("# DO NOT MODIFY", null)
             target.print("# Date: " + to_string(runtime.local_time()))
+            dbg_line_map.push_back("INTERNAL")
         end
         foreach it in custom_header
-            target.println(it)
+            println(it, null)
         end
         if is_package
-            target.println("import ecs as " + ecs_prefix + "ecs")
+            println("import ecs as " + ecs_prefix + "ecs", null)
         else
-            target.println("import ecs")
+            println("import ecs", null)
         end
         if slice_ext
-            target.println("import sdk_extension as " + ecs_prefix + "ecs_sdk")
-            target.println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)")
+            println("import sdk_extension as " + ecs_prefix + "ecs_sdk", null)
+            println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)", null)
         end
         for i = 0, i < lambda_list.size, ++i
-            target.println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(i + 1) + "__")
+            println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(i + 1) + "__", null)
             indent = 1
             link dat = lambda_list[i]
             foreach it in dat.capture_list
                 print_indent()
-                target.println("var " + it.first + " = null")
+                println("var " + it.first + " = null", null)
             end
             print_indent()
             target.print("function construct(")
@@ -2250,19 +2264,19 @@ class generator
                 str.cut(2)
                 target.print(str)
             end
-            target.println(")")
+            println(")", null)
             ++indent
             foreach it in dat.capture_list
                 print_indent()
                 if it.second
-                    target.println("this." + it.first + " = _" + it.first)
+                    println("this." + it.first + " = _" + it.first, null)
                 else
-                    target.println("this." + it.first + " := _" + it.first)
+                    println("this." + it.first + " := _" + it.first, null)
                 end
             end
             --indent
             print_indent()
-            target.println("end")
+            println("end", null)
             print_indent()
             target.print("function call(")
             if !dat.argument_list.empty()
@@ -2277,25 +2291,25 @@ class generator
                 str.cut(2)
                 target.print(str)
             end
-            target.println(")")
+            println(")", null)
             ++indent
             print_indent()
-            target.println("link self = this.call")
+            println("link self = this.call", null)
             foreach it in dat.argument_list
                 link map = it.second
                 if map.exist("pass-by-value")
                     print_indent()
-                    target.println(it.first + " := clone(" + it.first + ")")
+                    println(it.first + " := clone(" + it.first + ")", null)
                 end
                 if map.exist("check-type")
                     print_indent()
                     var type_id = get_id_of_visit_expr(map["check-type"])
                     if type_id != null && ecs.special_type.exist(type_id)
-                        target.println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")")
+                        println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", null)
                     else
                         target.print(ecs_prefix + "ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
                         this.visit_visit_expr(map["check-type"])
-                        target.println(")")
+                        println(")", null)
                     end
                 end
             end
@@ -2308,14 +2322,21 @@ class generator
                 print_indent()
                 target.print("return ")
                 this.visit_cond_expr(dat.body_expr)
-                target.println("")
+                println("", null)
             end
             --indent
             print_indent()
-            target.println("end")
-            target.println("end")
+            println("end", null)
+            println("end", null)
         end
         target.print(buff)
+        var dbg_ofs = iostream.ofstream(name + ".csym")
+        foreach it in dbg_line_map
+            dbg_ofs.println(it)
+        end
+        foreach it in file_dbg_info
+            dbg_ofs.println(it)
+        end
         return file_name
     end
 end
