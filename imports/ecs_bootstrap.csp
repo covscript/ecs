@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.3.5
+# Bootstrap of Extended Covariant Script Generator v1.3.7
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.3.6"
+var wrapper_ver = "1.3.7"
 
 function show_version()
 @begin
@@ -48,6 +48,7 @@ function show_help()
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
+        "   -g            Generate cSYM info\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
         "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
         "   -i <PATH>     Set import path\n" +
@@ -67,6 +68,7 @@ var no_hash = false
 var minmal = false
 var no_run = false
 var output = null
+var csym = false
 
 function process_args(cmd_args)
     var index = 1
@@ -91,6 +93,9 @@ function process_args(cmd_args)
             case "-c"
                 no_run = true
             end
+            case "-g"
+                csym = true
+            end
             case "-u"
                 if index == cmd_args.size - 1
                     system.out.println("Error: Option \"-u\" not completed. Usage: \"ecs -u <CHARSET>\"")
@@ -111,6 +116,7 @@ function process_args(cmd_args)
                     system.exit(0)
                 end
                 output = cmd_args[++index]
+                no_run = true
             end
             case "--"
                 if index == cmd_args.size - 1
@@ -202,21 +208,39 @@ function main(cmd_args)
         if output != null
             var result = ecs_reg.match(file_name)
             if !result.empty()
-                var name = codegen.run(output + system.path.separator + result.str(1).split({'\\', '/'})[-1], parser.ast)
-                if !no_hash
-                    iostream.ofstream("./.ecs_output/" + file_hash).println(name)
+                var name = output + system.path.separator + result.str(1).split({'\\', '/'})[-1]
+                var target_name = codegen.run(name, parser.ast)
+                if csym
+                    var csym_ofs = iostream.ofstream(name + ".csym")
+                    var dbg_info = "#$CSYM:"
+                    foreach it in codegen.dbg_line_map do dbg_info += it + ","
+                    dbg_info.cut(1)
+                    csym_ofs.println(dbg_info)
+                    foreach it in parser.code_buff do csym_ofs.println(it)
                 end
-                system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+                if !no_hash
+                    iostream.ofstream("./.ecs_output/" + file_hash).println(target_name)
+                end
+                system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + target_name + arguments))
             end
         else
             system.path.mkdir_p("./.ecs_output/")
-            var name = codegen.run("./.ecs_output/" + codec.sha256.hash_str(file_name), parser.ast)
+            var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
+            var target_name = codegen.run(name, parser.ast)
+            if csym
+                var csym_ofs = iostream.ofstream(name + ".csym")
+                var dbg_info = "#$CSYM:"
+                foreach it in codegen.dbg_line_map do dbg_info += it + ","
+                dbg_info.cut(1)
+                csym_ofs.println(dbg_info)
+                foreach it in parser.code_buff do csym_ofs.println(it)
+            end
             if !no_hash
                 var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
-                ofs.println(name)
+                ofs.println(target_name)
                 ofs.println(system.file.mtime(file_name))
             end
-            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + name + arguments))
+            system.exit(no_run ? 0 : system.run("cs " + compiler_args + " " + target_name + arguments))
         end
     end
 end

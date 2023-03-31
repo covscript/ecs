@@ -57,7 +57,7 @@ a = "Hello" : "world"
 b = [](...xxx)->xxx > 1 ? self(xxx - 2) + self(xxx - 1) : 1
 
 namespace xxx
-    using json.*, tcp_socket
+    using json.codec, tcp_socket
     namespace xxx
         var a = 10
     end
