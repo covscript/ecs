@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.4.1
+# Bootstrap of Extended Covariant Script Generator v1.4.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.4.1"
+var wrapper_ver = "1.4.2"
 
 function show_version()
 @begin
@@ -42,13 +42,14 @@ function show_help()
     system.out.println(
         "Usage: ecs [options...] <FILE> [arguments...]\n\n" +
         "Options:\n" +
-        "    Option    Function\n" +
+        "    Option       Function\n" +
         "   -h            Show help information\n" +
         "   -v            Show version infomation\n" +
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
         "   -g            Generate cSYM info\n" +
+        "   -d            Run debugger\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
         "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
         "   -i <PATH>     Set import path\n" +
@@ -62,11 +63,13 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
+var executor = "cs "
+var no_hash = false
 var csx_path = null
 var unicode = null
-var no_hash = false
 var minmal = false
 var no_run = false
+var splash = null
 var output = null
 var csym = false
 
@@ -96,6 +99,17 @@ function process_args(cmd_args)
             case "-g"
                 no_hash = true
                 csym = true
+            end
+            case "-d"
+                executor = "cs_dbg -s "
+                no_hash = true
+                csym = true
+                @begin
+                splash =
+                    "Extended Covariant Script Debugger\nVersion: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
+                    "Copyright (C) 2017-2023 Michael Lee. All rights reserved.\n" +
+                    "Please visit <http://covscript.org.cn/> for more information."
+                @end
             end
             case "-u"
                 if index == cmd_args.size - 1
@@ -183,7 +197,7 @@ function main(cmd_args)
                 var name = ifs.getline()
                 var mtime = ifs.getline().to_number()
                 if mtime == system.file.mtime(file_name)
-                    system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + name + arguments)))
+                    system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments)))
                 end
             end
         end
@@ -212,7 +226,7 @@ function main(cmd_args)
             if csx_path != null
                 compiler_args += " -i " + csx_path
             end
-            system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + file_name + arguments)))
+            system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + file_name + arguments)))
         end
         var codegen = new ecs_generator.generator
         if csx_path != null
@@ -241,7 +255,10 @@ function main(cmd_args)
                 if !no_hash
                     iostream.ofstream("./.ecs_output/" + file_hash).println(target_name)
                 end
-                system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + target_name + arguments)))
+                if splash != null
+                    system.out.println(splash)
+                end
+                system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments)))
             end
         else
             system.path.mkdir_p("./.ecs_output/")
@@ -261,7 +278,10 @@ function main(cmd_args)
                 ofs.println(target_name)
                 ofs.println(system.file.mtime(file_name))
             end
-            system.exit(no_run ? 0 : system.run(process_path("cs " + compiler_args + " " + target_name + arguments)))
+            if splash != null
+                system.out.println(splash)
+            end
+            system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments)))
         end
     end
 end
