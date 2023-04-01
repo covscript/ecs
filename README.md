@@ -25,15 +25,19 @@ chmod +x ecs
 Usage: ecs [options...] <FILE> [arguments...]
 
 Options:
-    Option    Function
-   -h         Show help information
-   -v         Show version infomation
-   -f         Disable compile cache
-   -m         Disable beautify
-   -c         Check grammar only
-   -i <PATH>  Set import path
-   -o <PATH>  Set output path
-   -- <ARGS>  Pass parameters to CovScript
+    Option       Function
+   -h            Show help information
+   -v            Show version infomation
+   -f            Disable compile cache
+   -m            Disable beautify
+   -c            Check grammar only
+   -g            Generate cSYM info
+   -d            Run debugger
+   -u <CHARSET>  Set unicode charset
+                 CHARSET = {"UTF8", "GBK"}
+   -i <PATH>     Set import path
+   -o <PATH>     Set output path
+   -- <ARGS>     Pass parameters to CovScript
 
 ```
 ## Compatibility Notice
