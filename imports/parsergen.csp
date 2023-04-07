@@ -1,5 +1,5 @@
-# Covariant Script Parser Generator v1.3.1 Release
-# Release Date: Fri Mar 31 23:43:24 2023
+# Covariant Script Parser Generator v1.3.5 Release
+# Release Date: Fri Apr  7 18:17:58 2023
 # Copyright (C) 2017-2023 Michael Lee(李登淳)
 # Github:  https://github.com/mikecovlee
 
@@ -188,7 +188,7 @@ class unicode_lexer_type
     end
     function cursor_forward()
         ++pos[2]
-        if pos[2] != data.size()
+        if pos[2] != data.size
             if data.at(pos[2]) == unicode.wchar.from_char('\n')
                 ++pos[1]
                 pos[0] = 0
@@ -229,7 +229,7 @@ class unicode_lexer_type
     end
     function run(lexical, text)
         data = cvt.local2wide(text)
-        while pos[2] != data.size()
+        while pos[2] != data.size
             var ch = data.at(pos[2])
             if lexical_set.empty()
                 var nbuff = ch.to_wstring()
@@ -454,7 +454,7 @@ class parser_type
         switch it.type
             case syntax_type.token
                 if eof()
-                    error("Early EOF, expected token \'" + it.data + "\'", lex.back.pos)
+                    error("Early EOF, expected token <" + it.data + ">", lex.back.pos)
                     return parse_state.eof
                 end
                 if peek().type != it.data
@@ -824,6 +824,7 @@ class generator
     var parser = null
     var stop_on_error = true
     var unicode_cvt = null
+    var show_prompt = true
     var enable_log = false
     var file_path = "<FILE>"
     function priv_run(lang)
@@ -835,17 +836,21 @@ class generator
                 lexer = new lexer_type
             end
             if rules[lang].lex == null
-                print_header("Lexical rules not found! Stop")
+                if show_prompt
+                    print_header("Lexical rules not found! Stop")
+                end
                 return false
             end
             token_buff = lexer.run(rules[lang].lex, input)
             if !lexer.error_log.empty()
-                if stop_on_error
-                    print_header("Compilation Error")
-                else
-                    print_header("Compilation Warning")
+                if show_prompt
+                    if stop_on_error
+                        print_header("Compilation Error")
+                    else
+                        print_header("Compilation Warning")
+                    end
+                    print_error(file_path, code_buff, lexer.error_log)
                 end
-                print_error(file_path, code_buff, lexer.error_log)
                 if stop_on_error
                     return false
                 end
@@ -853,17 +858,21 @@ class generator
             parser = new parser_type
             parser.log = enable_log
             if rules[lang].stx == null
-                print_header("Syntactic rules not found! Stop")
+                if show_prompt
+                    print_header("Syntactic rules not found! Stop")
+                end
                 return false
             end
             if parser.run(rules[lang].stx, token_buff)
                 ast = parser.production()
                 return true
             else
-                print_header("Compilation Error")
-                var err = {(lexer.error_log)..., (parser.get_log(0))...}
-                err.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
-                print_error(file_path, code_buff, err)
+                if show_prompt
+                    print_header("Compilation Error")
+                    var err = {(lexer.error_log)..., (parser.get_log(0))...}
+                    err.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
+                    print_error(file_path, code_buff, err)
+                end
                 return false
             end
         else
@@ -873,15 +882,10 @@ class generator
     function add_grammar(lang, gram)
         rules[lang] = gram
     end
-    function from_file(path)
-        var ifs = iostream.ifstream(path)
-        if !ifs.good()
-            return false
-        end
-        file_path = path
+    function from_stream(lang, input_stream)
         input = new string
         code_buff = new array
-        read_stream(ifs, code_buff)
+        read_stream(input_stream, code_buff)
         foreach line in code_buff
             input += line + "\n"
             for i = 0, i < line.size, ++i
@@ -891,17 +895,30 @@ class generator
             end
         end
         code_buff.push_back("")
-        foreach it in rules
-            var reg = regex.build(it.second.ext)
-            if !reg.match(path).empty()
-                return priv_run(it.first)
-            end
-        end
-        return false
+        return priv_run(lang)
     end
     function from_string(lang, str)
         input = str
         code_buff = input.split({'\n'})
         return priv_run(lang)
+    end
+    function from_file(path)
+        var ifs = iostream.ifstream(path)
+        if !ifs.good()
+            return false
+        end
+        file_path = path
+        foreach it in rules
+            var reg = regex.build(it.second.ext)
+            if !reg.match(path).empty()
+                return from_stream(it.first, ifs)
+            end
+        end
+        return false
+    end
+    function get_errors()
+        var err = {(lexer.error_log)..., (parser.get_log(0))...}
+        err.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
+        return move(err)
     end
 end

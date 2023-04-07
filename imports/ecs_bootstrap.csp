@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.4.2
+# Bootstrap of Extended Covariant Script Generator v1.4.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.4.2"
+var wrapper_ver = "1.4.3"
 
 function show_version()
 @begin
@@ -233,6 +233,7 @@ function main(cmd_args)
             compiler_args += " -i " + csx_path
             codegen.ecsx_path = csx_path.split({system.path.delimiter})
         end
+        codegen.gen_dbg_info = csym
         codegen.code_buff = parser.code_buff
         codegen.file_name = file_name
         codegen.minmal = minmal

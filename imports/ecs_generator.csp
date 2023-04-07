@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230304"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230401"
     constant std_version = "210604"
 end
 
@@ -85,10 +85,12 @@ class generator
     var dbg_line_map = new array
     function println(str, pos)
         target.println(str)
-        if pos == null
-            dbg_line_map.push_back("-")
-        else
-            dbg_line_map.push_back(to_string(pos[1]))
+        if gen_dbg_info
+            if pos == null
+                dbg_line_map.push_back("-")
+            else
+                dbg_line_map.push_back(to_string(pos[1]))
+            end
         end
     end
     function error(pos, text)
