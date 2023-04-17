@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230403"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230404"
     constant std_version = "210604"
 end
 
@@ -819,15 +819,46 @@ class generator
         stack.front.argument_list := arg_list
         # Recursive Visit lambda-body
         this.visit_lambda_body(nodes[idx++].nodes)
-        lambda_list.push_back(stack.front)
+        link current_lambda = stack.front
+        stack.pop_front()
+        # Optimize for simple lambda
+        if current_lambda.capture_list.empty()
+            var simple_args = true
+            foreach it in current_lambda.argument_list
+                link map = it.second
+                if map.exist("pass-by-value") || map.exist("check-type")
+                    simple_args = false
+                    break
+                end
+            end
+            if simple_args && current_lambda.body_expr != null
+                target.print("([](")
+                if !current_lambda.argument_list.empty()
+                    var str = new string
+                    foreach it in current_lambda.argument_list
+                        if it.second.exist("vargs")
+                            str += "..." + it.first + ", "
+                        else
+                            str += it.first + ", "
+                        end
+                    end
+                    str.cut(2)
+                    target.print(str)
+                end
+                target.print(")->")
+                this.visit_cond_expr(current_lambda.body_expr)
+                target.print(")")
+                return
+            end
+        end
+        lambda_list.push_back(current_lambda)
         target.print(ecs_prefix + "ecs.init_lambda(global.__" + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size + "__")
         var capture_str = ", "
-        foreach it in stack.front.capture_list
+        foreach it in current_lambda.capture_list
             capture_str += it.first + ", "
         end
         capture_str.cut(2)
         target.print(capture_str + ")")
-        stack.pop_front()
     end
     function visit_relat_expr(nodes)
         var idx = 0
