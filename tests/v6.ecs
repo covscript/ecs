@@ -1,0 +1,24 @@
+var g_val = 0
+var fun_map = {
+    "a": [](str)->str + "_a",
+    "b": [](str:string)->str + "_b",
+    "c": [g_val](str:string){ ++g_val; return str + "_c"; },
+    "d": []()->([](str)->str + "_d"),
+    "e": []()->([](str){ return str + "_e"; }),
+    "f": [](){
+        return [](str){
+            return str + "_f"
+        }
+    },
+    "g": []()->{"abc"}
+}.to_hash_map()
+system.out.println(fun_map["g"]()[0])
+loop
+    var input = system.in.getline()
+    system.out.println(fun_map.a(input))
+    system.out.println(fun_map.b(input))
+    system.out.println(fun_map.c(input))
+    system.out.println((fun_map.d())(input))
+    system.out.println((fun_map.e())(input))
+    system.out.println((fun_map.f())(input))
+end

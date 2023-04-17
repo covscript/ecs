@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230402"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230403"
     constant std_version = "210604"
 end
 
@@ -1542,6 +1542,7 @@ class generator
             	return
             end
         end
+        var expect_index = false
         # Repeat
         while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "fcall" || typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "index")
             # Condition
@@ -1549,11 +1550,16 @@ class generator
                 var matched = false
                 if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "fcall")
                     matched = true
+                    if expect_index
+                        error(nodes[idx++].nodes.front.pos, "Serial function calls are not allowed.")
+                    end
+                    expect_index = true
                     # Recursive Visit fcall
                     this.visit_fcall(nodes[idx++].nodes)
                 end
                 if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "index")
                     matched = true
+                    expect_index = false
                     # Recursive Visit index
                     this.visit_index(nodes[idx++].nodes)
                 end
