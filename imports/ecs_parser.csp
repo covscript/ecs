@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.5
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.6
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ var covscript_syntax = {
     )},
     "var-list" : {
         syntax.token("id"), syntax.cond_or(
-            {syntax.term("="), syntax.ref("single-expr")},
+            {syntax.term("="), syntax.ref("basic-expr")},
             {syntax.term("as"), syntax.ref("unary-expr"), syntax.optional(syntax.ref("array"))}
         ), syntax.optional(syntax.term(","), syntax.ref("var-list"))
     },
@@ -220,15 +220,11 @@ var covscript_syntax = {
     },
     # Expression
     "expr" : {
-        syntax.ref("single-expr"), syntax.optional(syntax.term(","), syntax.ref("expr"))
+        syntax.ref("basic-expr"), syntax.optional(syntax.term(","), syntax.ref("expr"))
     },
-    "single-expr" : {syntax.cond_or(
-        {syntax.ref("lambda-expr")},
-        {syntax.ref("basic-expr")}
-    )},
     "basic-expr" : {syntax.cond_or(
         {syntax.ref("var-bind"), syntax.term("="), syntax.ref("cond-expr")},
-        {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), syntax.ref("single-expr"))}
+        {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), syntax.ref("basic-expr"))}
     )},
     "asi-op" : {syntax.cond_or(
         {syntax.term("=")},
@@ -254,12 +250,17 @@ var covscript_syntax = {
         {syntax.term("{"), syntax.repeat(syntax.ref("statement"), syntax.repeat(syntax.token("endl"))), syntax.term("}")},
         {syntax.term("->"), syntax.ref("cond-expr")}
     )},
-    "cond-expr" : {
-        syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))
-    },
+    "cond-expr" : {syntax.cond_or(
+        {syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))},
+        {syntax.ref("lambda-expr")}
+    )},
     "cond-postfix" : {syntax.cond_or(
-        {syntax.term("?"), syntax.ref("logic-or-expr"), syntax.term(":"), syntax.ref("cond-expr")},
-        {syntax.term(":"), syntax.ref("logic-or-expr")}
+        {syntax.term("?"), syntax.ref("value-expr"), syntax.term(":"), syntax.ref("cond-expr")},
+        {syntax.term(":"), syntax.ref("value-expr")}
+    )},
+    "value-expr" : {syntax.cond_or(
+        {syntax.ref("logic-or-expr")},
+        {syntax.ref("lambda-expr")}
     )},
     "logic-or-expr" : {
         syntax.ref("logic-and-expr"), syntax.optional(syntax.cond_or({syntax.term("||")}, {syntax.term("or")}), syntax.ref("logic-or-expr"))
@@ -309,15 +310,15 @@ var covscript_syntax = {
         {syntax.token("str"), syntax.optional(syntax.ref("index"))},
         {syntax.term("local")},
         {syntax.term("global")},
-        {syntax.ref("ecsx_extend")},
+        {syntax.ref("ecsx-extend")},
         {syntax.ref("element")},
         {syntax.token("char")}
     )},
-    "ecsx_extend" : {
+    "ecsx-extend" : {
         syntax.token("id"), syntax.term("::"), syntax.token("id"), syntax.term("("), syntax.optional(syntax.ref("basic-expr")), syntax.term(")")
     },
     "element" : {
-        syntax.cond_or({syntax.token("id")}, {syntax.term("("), syntax.ref("single-expr"), syntax.term(")")}),
+        syntax.cond_or({syntax.token("id")}, {syntax.term("("), syntax.ref("basic-expr"), syntax.term(")")}),
         syntax.repeat(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))
     },
     "constant" : {syntax.cond_or(

@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230401"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230402"
     constant std_version = "210604"
 end
 
@@ -239,8 +239,8 @@ class generator
     end
     function visit_expr(nodes)
         var idx = 0
-        # Recursive Visit single-expr
-        this.visit_single_expr(nodes[idx++].nodes)
+        # Recursive Visit basic-expr
+        this.visit_basic_expr(nodes[idx++].nodes)
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
             # Visit term ","
@@ -574,27 +574,6 @@ class generator
         # Visit term "end"
         print_indent()
         println("end", {0, nodes.back.pos[1] - 1})
-    end
-    function visit_single_expr(nodes)
-        var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-expr")
-                matched = true
-                # Recursive Visit lambda-expr
-                this.visit_lambda_expr(nodes[idx++].nodes)
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "basic-expr")
-                matched = true
-                # Recursive Visit basic-expr
-                this.visit_basic_expr(nodes[idx++].nodes)
-            end
-            if !matched
-            	# Error
-            	return
-            end
-        end
     end
     function visit_capture_list(nodes)
         var idx = 0
@@ -1120,8 +1099,8 @@ class generator
                 if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "asi-op")
                     # Recursive Visit asi-op
                     this.visit_asi_op(nodes[idx++].nodes)
-                    # Recursive Visit single-expr
-                    this.visit_single_expr(nodes[idx++].nodes)
+                    # Recursive Visit basic-expr
+                    this.visit_basic_expr(nodes[idx++].nodes)
                 end
             end
             if !matched
@@ -1249,8 +1228,8 @@ class generator
                 matched = true
                 # Visit term "="
                 ++idx; target.print(" = ")
-                # Recursive Visit single-expr
-                this.visit_single_expr(nodes[idx++].nodes)
+                # Recursive Visit basic-expr
+                this.visit_basic_expr(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "as")
                 matched = true
@@ -1419,9 +1398,9 @@ class generator
                 # Visit term "global"
                 ++idx; target.print("global")
             end
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "ecsx_extend")
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "ecsx-extend")
                 matched = true
-                # Recursive Visit ecsx_extend
+                # Recursive Visit ecsx-extend
                 this.visit_ecsx_extend(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "element")
@@ -1553,8 +1532,8 @@ class generator
                 matched = true
                 # Visit term "("
                 ++idx; target.print("(")
-                # Recursive Visit single-expr
-                this.visit_single_expr(nodes[idx++].nodes)
+                # Recursive Visit basic-expr
+                this.visit_basic_expr(nodes[idx++].nodes)
                 # Visit term ")"
                 ++idx; target.print(")")
             end
@@ -1646,12 +1625,49 @@ class generator
     end
     function visit_cond_expr(nodes)
         var idx = 0
-        # Recursive Visit logic-or-expr
-        this.visit_logic_or_expr(nodes[idx++].nodes)
-        # Optional
-        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "cond-postfix")
-            # Recursive Visit cond-postfix
-            this.visit_cond_postfix(nodes[idx++].nodes)
+        # Condition
+        block
+            var matched = false
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "logic-or-expr")
+                matched = true
+                # Recursive Visit logic-or-expr
+                this.visit_logic_or_expr(nodes[idx++].nodes)
+                # Optional
+                if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "cond-postfix")
+                    # Recursive Visit cond-postfix
+                    this.visit_cond_postfix(nodes[idx++].nodes)
+                end
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-expr")
+                matched = true
+                # Recursive Visit lambda-expr
+                this.visit_lambda_expr(nodes[idx++].nodes)
+            end
+            if !matched
+            	# Error
+            	return
+            end
+        end
+    end
+    function visit_value_expr(nodes)
+        var idx = 0
+        # Condition
+        block
+            var matched = false
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "logic-or-expr")
+                matched = true
+                # Recursive Visit logic-or-expr
+                this.visit_logic_or_expr(nodes[idx++].nodes)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-expr")
+                matched = true
+                # Recursive Visit lambda-expr
+                this.visit_lambda_expr(nodes[idx++].nodes)
+            end
+            if !matched
+            	# Error
+            	return
+            end
         end
     end
     function visit_cond_postfix(nodes)
@@ -1663,8 +1679,8 @@ class generator
                 matched = true
                 # Visit term "?"
                 ++idx; target.print(" ? ")
-                # Recursive Visit logic-or-expr
-                this.visit_logic_or_expr(nodes[idx++].nodes)
+                # Recursive Visit value-expr
+                this.visit_value_expr(nodes[idx++].nodes)
                 # Visit term ":"
                 ++idx; target.print(" : ")
                 # Recursive Visit cond-expr
@@ -1674,8 +1690,8 @@ class generator
                 matched = true
                 # Visit term ":"
                 ++idx; target.print(" : ")
-                # Recursive Visit logic-or-expr
-                this.visit_logic_or_expr(nodes[idx++].nodes)
+                # Recursive Visit value-expr
+                this.visit_value_expr(nodes[idx++].nodes)
             end
             if !matched
             	# Error
