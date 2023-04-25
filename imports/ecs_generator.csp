@@ -40,8 +40,8 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230404"
-    constant std_version = "210604"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230405"
+    constant std_version = "210605"
 end
 
 import parsergen, ecs
@@ -130,12 +130,15 @@ class generator
                 nodes := nodes[0].nodes
                 if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "mul-expr"
                     nodes := nodes[0].nodes
-                    if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "unary-expr"
+                    if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "conv-expr"
                         nodes := nodes[0].nodes
-                        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "prim-expr"
+                        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "unary-expr"
                             nodes := nodes[0].nodes
-                            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "visit-expr"
-                                return get_id_of_visit_expr(nodes[0].nodes)
+                            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "prim-expr"
+                                nodes := nodes[0].nodes
+                                if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "visit-expr"
+                                    return get_id_of_visit_expr(nodes[0].nodes)
+                                end
                             end
                         end
                     end
@@ -642,35 +645,61 @@ class generator
                 this.visit_unary_expr(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
+                matched = true
                 # Optional
                 if nodes.size > 2 && (typeid nodes[2] == typeid parsergen.syntax_tree && nodes[2].root == "array")
-                    matched = true
-                    # Condition
-                    block
-                        var matched = false
-                        if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
-                            matched = true
-                            # Visit term "new"
-                            ++idx; target.print(ecs_prefix + "ecs.param_new(")
+                    var id = get_id_of_visit_expr(nodes[1].nodes)
+                    if id != null && ecs.internal_type.exist(id)
+                        # Condition
+                        block
+                            var matched = false
+                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
+                                matched = true
+                                # Visit term "new"
+                                ++idx; target.print(ecs_prefix + "ecs.type_constructor.__" + id + "(")
+                            end
+                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
+                                matched = true
+                                # Visit term "gcnew"
+                                ++idx; target.print(ecs_prefix + "&ecs.type_constructor.__" + id + "(")
+                            end
+                            if !matched
+                                # Error
+                                return
+                            end
                         end
-                        if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
-                            matched = true
-                            # Visit term "gcnew"
-                            ++idx; target.print(ecs_prefix + "ecs.param_gcnew(")
+                        # Recursive Visit visit-expr
+                        idx++
+                        # Recursive Visit array
+                        this.visit_array(nodes[idx++].nodes)
+                        target.print("...)")
+                    else
+                        # Condition
+                        block
+                            var matched = false
+                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
+                                matched = true
+                                # Visit term "new"
+                                ++idx; target.print(ecs_prefix + "ecs.param_new(")
+                            end
+                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
+                                matched = true
+                                # Visit term "gcnew"
+                                ++idx; target.print(ecs_prefix + "ecs.param_gcnew(")
+                            end
+                            if !matched
+                                # Error
+                                return
+                            end
                         end
-                        if !matched
-                            # Error
-                            return
-                        end
+                        # Recursive Visit visit-expr
+                        this.visit_visit_expr(nodes[idx++].nodes)
+                        target.print(", ")
+                        # Recursive Visit array
+                        this.visit_array(nodes[idx++].nodes)
+                        target.print(")")
                     end
-                    # Recursive Visit unary-expr
-                    this.visit_unary_expr(nodes[idx++].nodes)
-                    target.print(", ")
-                    # Recursive Visit array
-                    this.visit_array(nodes[idx++].nodes)
-                    target.print(")")
                 else
-                    matched = true
                     # Condition
                     block
                         var matched = false
@@ -689,8 +718,8 @@ class generator
                             return
                         end
                     end
-                    # Recursive Visit unary-expr
-                    this.visit_unary_expr(nodes[idx++].nodes)
+                    # Recursive Visit visit-expr
+                    this.visit_visit_expr(nodes[idx++].nodes)
                 end
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "prim-expr")
@@ -1142,8 +1171,8 @@ class generator
     end
     function visit_mul_expr(nodes)
         var idx = 0
-        # Recursive Visit unary-expr
-        this.visit_unary_expr(nodes[idx++].nodes)
+        # Recursive Visit conv-expr
+        this.visit_conv_expr(nodes[idx++].nodes)
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "*" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "/" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "%" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "^")
             # Condition
@@ -1176,6 +1205,29 @@ class generator
             end
             # Recursive Visit mul-expr
             this.visit_mul_expr(nodes[idx++].nodes)
+        end
+    end
+    function visit_conv_expr(nodes)
+        if nodes.size > 1
+            # Recursive Visit visit-expr
+            link visit_expr_nodes = nodes[2].nodes
+            var id = get_id_of_visit_expr(visit_expr_nodes)
+            if id != null && ecs.internal_type.exist(id)
+                target.print(ecs_prefix + "ecs.type_constructor.__" + id + "(")
+                # Recursive Visit unary-expr
+                this.visit_unary_expr(nodes[0].nodes)
+                target.print(")")
+            else
+                target.print(ecs_prefix + "ecs.param_new(")
+                this.visit_visit_expr(visit_expr_nodes)
+                target.print(", {")
+                # Recursive Visit unary-expr
+                this.visit_unary_expr(nodes[0].nodes)
+                target.print("})")
+            end
+        else
+            # Recursive Visit unary-expr
+            this.visit_unary_expr(nodes[0].nodes)
         end
     end
     function visit_switch_stmts(nodes)

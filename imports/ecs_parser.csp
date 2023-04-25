@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.6
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.2.7
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,7 @@ function get_lexical(reg_builder)
         "char" : reg_builder("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
         "bsig" : reg_builder("^(;|:=?|::|\\?|\\.\\.?|\\.\\.\\.)$"),
         "msig" : reg_builder("^(\\+(\\+|=)?|-(-|=|>)?|\\*=?|/=?|%=?|\\^=?)$"),
-        "lsig" : reg_builder("^(>|<|&|(\\|)|&&|(\\|\\|)|!|==?|!=?|>=?|<=?)$"),
+        "lsig" : reg_builder("^(>|<|&|(\\|)|&&|(\\|\\|)|!|=(=|>)?|!=?|>=?|<=?)$"),
         "brac" : reg_builder("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
         "prep" : reg_builder("^@.*$"),
         "ign" :  reg_builder("^([ \\f\\r\\t\\v]+|#.*)$"),
@@ -278,11 +278,14 @@ var covscript_syntax = {
         syntax.ref("mul-expr"), syntax.optional(syntax.cond_or({syntax.term("+")}, {syntax.term("-")}), syntax.ref("add-expr"))
     },
     "mul-expr" : {
-        syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), syntax.ref("mul-expr"))
+        syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), syntax.ref("mul-expr"))
+    },
+    "conv-expr" : {
+        syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), syntax.ref("visit-expr"))
     },
     "unary-expr" : {syntax.cond_or(
         {syntax.ref("unary-op"), syntax.ref("unary-expr")},
-        {syntax.cond_or({syntax.term("new")}, {syntax.term("gcnew")}), syntax.ref("unary-expr"), syntax.optional(syntax.ref("array"))},
+        {syntax.cond_or({syntax.term("new")}, {syntax.term("gcnew")}), syntax.ref("visit-expr"), syntax.optional(syntax.ref("array"))},
         {syntax.ref("prim-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("postfix-expr"))}
     )},
     "unary-op" : {syntax.cond_or(

@@ -1,0 +1,19 @@
+class test
+    var sum = 0
+    function construct(...args)
+        foreach it in args do sum += it
+    end
+    function to_string()
+        system.out.println("Class 'test' to_string called")
+        return global.to_string(sum)
+    end
+end
+system.out.println(3.14 as integer)
+system.out.println("3.14" => number)
+system.out.println(3.14 as string)
+system.out.println({1, 2, 3}... => test)
+system.out.println(('!' => integer) as char)
+system.out.println({"hello": "world"} as hash_map)
+system.out.println({"hello", "world"} => hash_set)
+system.out.println(new integer{6.28})
+system.out.println(gcnew string{6.28})

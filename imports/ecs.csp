@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.2.4
+# Extended Covariant Script Header: v1.2.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -165,3 +165,72 @@ function ecs_slice_ext(arr, beg, end, step)
     end
     return move(slice_data)
 end
+
+class invalid_type
+    var error_text = new string
+    function construct(msg)
+        error_text = to_string(msg)
+    end
+    function what()
+        return error_text
+    end
+end
+
+namespace type_constructor
+    function __number(val)
+        switch typeid val
+            default
+                throw_exception(param_new(invalid_type, {"Invalid type when construct number, require number, char or string."}))
+            end
+            case typeid number
+                return clone(val)
+            end
+            case typeid char
+                return to_integer(val)
+            end
+            case typeid string
+                return val.to_number()
+            end
+        end
+    end
+    function __integer(val)
+        return type_constructor.__number(val).ntoi()
+    end
+    function __float(val)
+        return type_constructor.__number(val).ntof()
+    end
+    function __char(val)
+        if typeid val != typeid number || val.is_float()
+            throw_exception(param_new(invalid_type, {"Invalid type when construct char, require integer."}))
+        end
+        return char.from_ascii(val)
+    end
+    function __string(val)
+        return to_string(val)
+    end
+    function __list(val)
+        if typeid val != typeid array
+            throw_exception(param_new(invalid_type, {"Invalid type when construct list, require array."}))
+        end
+        return val.to_list()
+    end
+    function __hash_map(val)
+        if typeid val != typeid array
+            throw_exception(param_new(invalid_type, {"Invalid type when construct hash map, require array."}))
+        end
+        return val.to_hash_map()
+    end
+    function __hash_set(val)
+        if typeid val != typeid array
+            throw_exception(param_new(invalid_type, {"Invalid type when construct hash set, require array."}))
+        end
+        return val.to_hash_set()
+    end
+end
+
+@begin
+var internal_type = {
+    "number", "integer", "float", "char", "string",
+    "list", "hash_map", "hash_set"
+}.to_hash_set()
+@end
