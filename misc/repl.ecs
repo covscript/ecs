@@ -1,0 +1,137 @@
+import parsergen, ecs_parser, ecs_generator, network.*
+
+function compress_ast(n)
+    foreach it in n.nodes
+        while typeid it == typeid parsergen.syntax_tree && it.nodes.size == 1
+            it = it.nodes.front
+        end
+        if typeid it == typeid parsergen.syntax_tree
+            compress_ast(it)
+        else
+            if it.type == "endl"
+                it.data = "\\n"
+            end
+        end
+    end
+end
+
+class repl
+    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"}=>hash_set
+    var codegen = new ecs_generator.generator
+    var parser = new parsergen.repl_parser_type
+    var code_buff = new array
+    var stages = new array
+    var log = false
+    function find_first_stage(parser)
+        foreach it in parser.stack
+            link name = it.product.root
+            if !syntax_stages.exist(name)
+                return name
+            end
+        end
+    end
+    function repl_hook(parser)
+        if !parser.eof()
+            return parsergen.parse_state.accept
+        end
+        if stages.size > 0
+            var tokens = null
+            loop
+                tokens = this.readline()
+            until tokens != null
+            foreach it in tokens do parser.lex.push_back(it)
+        end
+        return parsergen.parse_state.accept
+    end
+    function on_eof_hook(parser)
+        if log
+            system.out.println("Parsing stages:")
+            foreach it in parser.stack
+                system.out.println("-> " + it.product.root)
+            end
+            system.out.println("")
+        end
+        stages.push_front(find_first_stage(parser))
+        var tokens = null
+        loop
+            tokens = this.readline()
+        until tokens != null
+        foreach it in tokens do parser.lex.push_back(it)
+        return true
+    end
+    function accept_hook(parser)
+        if !stages.empty() && find_first_stage(parser) == stages.front
+            stages.pop_front()
+        end
+    end
+    function initialize()
+        ecs_parser.grammar.stx.stmts = ecs_parser.grammar.stx.stmts_repl
+        ecs_parser.repl_hook = repl_hook
+        parser.on_eof_hook = on_eof_hook
+        parser.accept_hook = accept_hook
+        codegen.file_name = "<REPL>"
+        codegen.minmal = true
+    end
+    function readline()
+        foreach i in range(stages.size + 1) do system.out.print(">")
+        system.out.print(" ")
+        var line = system.in.getline()
+        code_buff.push_back(line)
+        if line == "@exit"
+            system.exit(0)
+        end
+        line += "\n"
+        var lexer = new parsergen.lexer_type
+        var tokens = lexer.run(ecs_parser.grammar.lex, line)
+        if !lexer.error_log.empty()
+            parsergen.print_error("<REPL>", code_buff, lexer.error_log)
+            code_buff = new array
+            return null
+        else
+            return tokens
+        end
+    end
+    function run()
+        var sock = new tcp.socket
+        sock.connect(tcp.endpoint("127.0.0.1", 222))
+        sock.send(codegen.repl_header())
+        parser.log = log
+        loop
+            var tokens = null
+            loop
+                tokens = this.readline()
+            until tokens != null
+            if parser.run(ecs_parser.grammar.stx, tokens)
+                var ast = parser.production()
+                if ast != null
+                    if log
+                        var compressed_ast = ast
+                        compress_ast(compressed_ast)
+                        parsergen.print_ast(compressed_ast)
+                    end
+                    codegen.code_buff = code_buff
+                    var code = codegen.repl_run(ast)
+                    if code != null
+                        sock.send(code)
+                        while sock.available() == 0
+                            runtime.delay(10)
+                        end
+                        while sock.available() != 0
+                            system.out.print(sock.receive(sock.available()))
+                            runtime.delay(10)
+                        end
+                    end
+                    code_buff = new array
+                end
+            else
+                var err = parser.get_log(0)
+                parsergen.print_error("<REPL>", {code_buff..., ""}, err)
+                code_buff = new array
+            end
+        end
+    end
+end
+
+var instance = new repl
+# instance.log = true
+instance.run()

@@ -1,0 +1,43 @@
+import network.*, process
+
+class repl_server
+    var repl_process = null
+    var sock = new tcp.socket
+    function process_worker()
+        var out = repl_process.out()
+        var buff = new string
+        loop
+            var ch = context.await(out.get)
+            #system.out.print(ch)
+            sock.send(to_string(ch))
+        end
+    end
+    function network_worker()
+        var in = repl_process.in()
+        loop
+            while sock.available() == 0
+                context.yield()
+            end
+            in.print(sock.receive(sock.available()))
+        end
+    end
+    function init()
+        system.out.println("Waiting for connection")
+        var acceptor = tcp.acceptor(tcp.endpoint_v4(222))
+        sock.accept(acceptor)
+        repl_process = (new process.builder).cmd("cs").arg({"--silent"}).merge_output(true).start()
+        system.out.println("REPL Server started at localhost:222")
+        var co_p = context.create_co(process_worker)
+        var co_n = context.create_co(network_worker)
+        loop
+            if repl_process.has_exited()
+                break
+            end
+            context.resume(co_p)
+            context.resume(co_n)
+        end
+        system.out.println("REPL Server exited normally")
+    end
+end
+
+(new repl_server).init()
