@@ -22,15 +22,130 @@ package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
 
-var wrapper_ver = "1.4.3"
+var wrapper_ver = "1.5.1"
 
-function show_version()
+function show_version_simple()
 @begin
     system.out.println(
         "Version: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
         "Copyright (C) 2017-2023 Michael Lee. All rights reserved.\n" +
-        "Please visit http://covscript.org.cn/ for more information.\n\n" +
-        "Metadata:\n" +
+        "Please visit http://covscript.org.cn/ for more information."
+    )
+@end
+end
+
+class repl
+    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"} => hash_set
+    var codegen = new ecs_generator.generator
+    var parser = new parsergen.repl_parser_type
+    var repl_impl = null
+    var code_buff = new array
+    var stages = new array
+    function find_first_stage(parser)
+        foreach it in parser.stack
+            link name = it.product.root
+            if !syntax_stages.exist(name)
+                return name
+            end
+        end
+    end
+    function repl_hook(parser)
+        if !parser.eof()
+            return parsergen.parse_state.accept
+        end
+        if stages.size > 0
+            var tokens = null
+            loop
+                tokens = this.readline()
+            until tokens != null
+            foreach it in tokens do parser.lex.push_back(it)
+        end
+        return parsergen.parse_state.accept
+    end
+    function on_eof_hook(parser)
+        stages.push_front(find_first_stage(parser))
+        var tokens = null
+        loop
+            tokens = this.readline()
+        until tokens != null
+        foreach it in tokens do parser.lex.push_back(it)
+        return true
+    end
+    function accept_hook(parser)
+        if !stages.empty() && find_first_stage(parser) == stages.front
+            stages.pop_front()
+        end
+    end
+    function initialize()
+        ecs_parser.grammar.stx.stmts = ecs_parser.grammar.stx.stmts_repl
+        ecs_parser.repl_hook = repl_hook
+        parser.on_eof_hook = on_eof_hook
+        parser.accept_hook = accept_hook
+        codegen.file_name = "<REPL_ENV>"
+        codegen.minmal = true
+    end
+    function readline()
+        foreach i in range(stages.size) do system.out.print(".")
+        system.out.print("> ")
+        var line = repl_impl.readline()
+        code_buff.push_back(line)
+        if line == "@exit"
+            system.exit(0)
+        end
+        line += "\n"
+        var lexer = new parsergen.lexer_type
+        var tokens = lexer.run(ecs_parser.grammar.lex, line)
+        if !lexer.error_log.empty()
+            parsergen.print_error("<REPL_ENV>", code_buff, lexer.error_log)
+            code_buff = new array
+            return new array
+        else
+            return tokens
+        end
+    end
+    function run(...args)
+        system.out.println("Extended Covariant Script Interpreter REPL")
+        show_version_simple()
+        repl_impl = sdk.repl.create(args)
+        var header = codegen.repl_header().split({'\n'})
+        repl_impl.echo(false)
+        foreach line in header do repl_impl.exec(line)
+        repl_impl.echo(true)
+        loop
+            var tokens = null
+            loop
+                tokens = this.readline()
+            until tokens != null
+            if parser.run(ecs_parser.grammar.stx, tokens)
+                var ast = parser.production()
+                if ast != null
+                    codegen.code_buff = code_buff
+                    var code = codegen.repl_run(ast)
+                    if code != null
+                        code = code.split({'\n'})
+                        foreach line in code
+                            if !repl_impl.exec(line)
+                                system.exit(0)
+                            end
+                        end
+                    end
+                    code_buff = new array
+                end
+            else
+                var err = parser.get_log(0)
+                parsergen.print_error("<REPL_ENV>", {code_buff..., ""}, err)
+                code_buff = new array
+                repl_impl.reset()
+            end
+        end
+    end
+end
+
+function show_version()
+    show_version_simple()
+@begin
+    system.out.println(
+        "\nMetadata:\n" +
         "  STD Version: " + ecs_generator.ecs_info.std_version + "\n"
     )
 @end
@@ -40,21 +155,27 @@ end
 function show_help()
 @begin
     system.out.println(
-        "Usage: ecs [options...] <FILE> [arguments...]\n\n" +
-        "Options:\n" +
-        "    Option       Function\n" +
-        "   -h            Show help information\n" +
-        "   -v            Show version infomation\n" +
+        "Usage:\n" +
+        "    ecs [options...] <FILE> [arguments...]\n" +
+        "    ecs [options...]\n\n" +
+        "Interpreter Options:\n" +
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
+        "   -o <PATH>     Set output path\n" +
+        "   -- <ARGS>     Pass parameters to CovScript\n\n"
+        "Interpreter REPL Options:\n" +
+        "   -s            Close the command prompt\n" +
+        "   -r <ARGS...>  Set arguments for REPL\n\n" +
+        "Common Options:\n" +
+        "    Option       Function\n" +
+        "   -h            Show help information\n" +
+        "   -v            Show version infomation\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
         "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
         "   -i <PATH>     Set import path\n" +
-        "   -o <PATH>     Set output path\n" +
-        "   -- <ARGS>     Pass parameters to CovScript\n"
     )
 @end
     system.exit(0)
@@ -72,6 +193,7 @@ var no_run = false
 var splash = null
 var output = null
 var csym = false
+var repl = false
 
 function process_args(cmd_args)
     var index = 1
@@ -95,6 +217,10 @@ function process_args(cmd_args)
             end
             case "-c"
                 no_run = true
+            end
+            case "-r"
+                repl = true
+                break
             end
             case "-g"
                 no_hash = true
@@ -144,10 +270,11 @@ function process_args(cmd_args)
         ++index
     end
     if index == cmd_args.size
-        system.out.println("Error: no input file.")
-        system.exit(0)
+        repl = true
     end
-    file_name = cmd_args[index++]
+    if !repl
+        file_name = cmd_args[index++]
+    end
     while index < cmd_args.size
         arguments += " " + cmd_args[index++] 
     end
@@ -183,6 +310,11 @@ end
 
 function main(cmd_args)
     process_args(cmd_args)
+    if repl
+        var instance = new repl
+        instance.run()
+        system.exit(0)
+    end
     if !system.file.exist(file_name) || !match(regex.build(ecs_parser.grammar.ext), file_name)
         system.out.println("Error: invalid input file.")
         system.exit(0)

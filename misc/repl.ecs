@@ -15,6 +15,8 @@ function compress_ast(n)
     end
 end
 
+var wrapper_ver = "1.4.3"
+
 class repl
     var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"} => hash_set
     var codegen = new ecs_generator.generator
@@ -93,9 +95,15 @@ class repl
         end
     end
     function run(...args)
+        system.out.println("Extended Covariant Script REPL")
+        system.out.println("Version: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver)
+        system.out.println("Copyright (C) 2017-2023 Michael Lee. All rights reserved.")
+        system.out.println("Please visit <http://covscript.org.cn/> for more information.")
         repl_impl = sdk.repl.create(args)
         var header = codegen.repl_header().split({'\n'})
+        repl_impl.echo(false)
         foreach line in header do repl_impl.exec(line)
+        repl_impl.echo(true)
         parser.log = log
         loop
             var tokens = null
@@ -113,7 +121,7 @@ class repl
                     codegen.code_buff = code_buff
                     var code = codegen.repl_run(ast)
                     if code != null
-                        system.out.println(code)
+                        #system.out.println(code)
                         code = code.split({'\n'})
                         foreach line in code
                             if !repl_impl.exec(line)
@@ -125,7 +133,7 @@ class repl
                 end
             else
                 var err = parser.get_log(0)
-                parsergen.print_error("<REPL>", {code_buff..., ""}, err)
+                parsergen.print_error("<REPL_ENV>", {code_buff..., ""}, err)
                 code_buff = new array
                 repl_impl.reset()
             end

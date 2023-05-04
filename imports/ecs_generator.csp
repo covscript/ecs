@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Preview) Build 230405"
+    constant version = "4.0.0 Cuon alpinus(Preview) Build 230501"
     constant std_version = "210605"
 end
 
@@ -2408,7 +2408,7 @@ class generator
         end
     end
     function repl_header()
-        return "import ecs\nimport sdk_extension as ecs_sdk\necs_sdk.extend_type(array, \"ecs_slice_ext\", ecs.ecs_slice_ext)\n"
+        return "import ecs\nimport sdk_extension as ecs_sdk\necs_sdk.extend_type(array, \"ecs_slice_ext\", ecs.ecs_slice_ext)"
     end
     function repl_run(ast)
         var buff = new iostream.char_buff
@@ -2426,6 +2426,7 @@ class generator
         var header = new iostream.char_buff
         target = header.get_ostream()
         gen_internal()
+        lambda_list = new array
         return to_string(header) + to_string(buff)
     end
     function run(name, ast)
@@ -2464,6 +2465,7 @@ class generator
             println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)", null)
         end
         gen_internal()
+        lambda_list = new array
         target.print(buff)
         foreach it in file_dbg_info do dbg_line_map.push_back(it)
         return file_name
