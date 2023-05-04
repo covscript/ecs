@@ -1,4 +1,4 @@
-import parsergen, ecs_parser, ecs_generator, network.*
+import parsergen, ecs_parser, ecs_generator, sdk_extension as sdk
 
 function compress_ast(n)
     foreach it in n.nodes
@@ -16,9 +16,10 @@ function compress_ast(n)
 end
 
 class repl
-    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"}=>hash_set
+    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"} => hash_set
     var codegen = new ecs_generator.generator
     var parser = new parsergen.repl_parser_type
+    var repl_impl = null
     var code_buff = new array
     var stages = new array
     var log = false
@@ -73,9 +74,9 @@ class repl
         codegen.minmal = true
     end
     function readline()
-        foreach i in range(stages.size + 1) do system.out.print(">")
-        system.out.print(" ")
-        var line = system.in.getline()
+        foreach i in range(stages.size) do system.out.print(".")
+        system.out.print("> ")
+        var line = repl_impl.readline()
         code_buff.push_back(line)
         if line == "@exit"
             system.exit(0)
@@ -86,15 +87,15 @@ class repl
         if !lexer.error_log.empty()
             parsergen.print_error("<REPL>", code_buff, lexer.error_log)
             code_buff = new array
-            return null
+            return new array
         else
             return tokens
         end
     end
-    function run()
-        var sock = new tcp.socket
-        sock.connect(tcp.endpoint("127.0.0.1", 222))
-        sock.send(codegen.repl_header())
+    function run(...args)
+        repl_impl = sdk.repl.create(args)
+        var header = codegen.repl_header().split({'\n'})
+        foreach line in header do repl_impl.exec(line)
         parser.log = log
         loop
             var tokens = null
@@ -112,13 +113,12 @@ class repl
                     codegen.code_buff = code_buff
                     var code = codegen.repl_run(ast)
                     if code != null
-                        sock.send(code)
-                        while sock.available() == 0
-                            runtime.delay(10)
-                        end
-                        while sock.available() != 0
-                            system.out.print(sock.receive(sock.available()))
-                            runtime.delay(10)
+                        system.out.println(code)
+                        code = code.split({'\n'})
+                        foreach line in code
+                            if !repl_impl.exec(line)
+                                system.exit(0)
+                            end
                         end
                     end
                     code_buff = new array
@@ -127,6 +127,7 @@ class repl
                 var err = parser.get_log(0)
                 parsergen.print_error("<REPL>", {code_buff..., ""}, err)
                 code_buff = new array
+                repl_impl.reset()
             end
         end
     end

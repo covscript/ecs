@@ -1886,11 +1886,7 @@ class generator
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ";")
                 matched = true
                 # Visit term ";"
-                if minmal
-                    ++idx; target.print(";")
-                else
-                    ++idx; println("", nodes.front.pos)
-                end
+                ++idx; println("", nodes.front.pos)
             end
             if !matched
             	# Error

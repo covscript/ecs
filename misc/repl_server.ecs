@@ -1,5 +1,22 @@
 import network.*, process
 
+function send_packet(sock, data)
+    var size = to_string(data.size)
+    while size.size < 8
+        size += " "
+    end
+    sock.send(size)
+    sock.send(data)
+end
+
+function receive_packet(sock)
+    while sock.available() == 0
+        runtime.delay(10)
+    end
+    var size = sock.receive(8) as integer
+    return sock.receive(size)
+end
+
 class repl_server
     var repl_process = null
     var sock = new tcp.socket
@@ -7,9 +24,8 @@ class repl_server
         var out = repl_process.out()
         var buff = new string
         loop
-            var ch = context.await(out.get)
-            #system.out.print(ch)
-            sock.send(to_string(ch))
+            var line = context.await(out.getline)
+            send_packet(sock, line)
         end
     end
     function network_worker()
@@ -18,7 +34,7 @@ class repl_server
             while sock.available() == 0
                 context.yield()
             end
-            in.print(sock.receive(sock.available()))
+            in.print(receive_packet(sock))
         end
     end
     function init()
