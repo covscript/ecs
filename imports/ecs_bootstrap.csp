@@ -21,6 +21,7 @@
 package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
+import sdk_extension as sdk
 
 var wrapper_ver = "1.5.1"
 
@@ -34,13 +35,15 @@ function show_version_simple()
 @end
 end
 
-class repl
-    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"} => hash_set
+class repl_instance
+    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"}.to_hash_set()
     var codegen = new ecs_generator.generator
     var parser = new parsergen.repl_parser_type
+    var unicode_cvt = null
     var repl_impl = null
     var code_buff = new array
     var stages = new array
+    var silent = false
     function find_first_stage(parser)
         foreach it in parser.stack
             link name = it.product.root
@@ -85,15 +88,24 @@ class repl
         codegen.minmal = true
     end
     function readline()
-        foreach i in range(stages.size) do system.out.print(".")
-        system.out.print("> ")
+        if !silent
+            foreach i in range(stages.size*2) do system.out.print(".")
+            system.out.print("> ")
+        end
         var line = repl_impl.readline()
         code_buff.push_back(line)
         if line == "@exit"
             system.exit(0)
         end
         line += "\n"
-        var lexer = new parsergen.lexer_type
+        var lexer = null
+        if unicode_cvt != null
+            system.out.println("Unicode Enabled")
+            lexer = new parsergen.unicode_lexer_type
+            lexer.cvt = unicode_cvt
+        else
+            lexer = new parsergen.lexer_type
+        end
         var tokens = lexer.run(ecs_parser.grammar.lex, line)
         if !lexer.error_log.empty()
             parsergen.print_error("<REPL_ENV>", code_buff, lexer.error_log)
@@ -104,13 +116,15 @@ class repl
         end
     end
     function run(...args)
-        system.out.println("Extended Covariant Script Interpreter REPL")
-        show_version_simple()
+        if !silent
+            system.out.println("Extended Covariant Script Interpreter REPL")
+            show_version_simple()
+        end
         repl_impl = sdk.repl.create(args)
         var header = codegen.repl_header().split({'\n'})
         repl_impl.echo(false)
         foreach line in header do repl_impl.exec(line)
-        repl_impl.echo(true)
+        repl_impl.echo(!silent)
         loop
             var tokens = null
             loop
@@ -123,10 +137,16 @@ class repl
                     var code = codegen.repl_run(ast)
                     if code != null
                         code = code.split({'\n'})
-                        foreach line in code
-                            if !repl_impl.exec(line)
-                                system.exit(0)
+                        try
+                            foreach line in code
+                                if !repl_impl.exec(line)
+                                    system.exit(0)
+                                end
                             end
+                        catch e
+                            system.out.println(e.what)
+                            stages = new array
+                            repl_impl.reset()
                         end
                     end
                     code_buff = new array
@@ -135,6 +155,7 @@ class repl
                 var err = parser.get_log(0)
                 parsergen.print_error("<REPL_ENV>", {code_buff..., ""}, err)
                 code_buff = new array
+                stages = new array
                 repl_impl.reset()
             end
         end
@@ -165,7 +186,7 @@ function show_help()
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
         "   -o <PATH>     Set output path\n" +
-        "   -- <ARGS>     Pass parameters to CovScript\n\n"
+        "   -- <ARGS>     Pass parameters to CovScript\n\n" +
         "Interpreter REPL Options:\n" +
         "   -s            Close the command prompt\n" +
         "   -r <ARGS...>  Set arguments for REPL\n\n" +
@@ -175,7 +196,7 @@ function show_help()
         "   -v            Show version infomation\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
         "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
-        "   -i <PATH>     Set import path\n" +
+        "   -i <PATH>     Set import path\n"
     )
 @end
     system.exit(0)
@@ -184,12 +205,14 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
+var args_arr = new array
 var executor = "cs "
 var no_hash = false
 var csx_path = null
 var unicode = null
 var minmal = false
 var no_run = false
+var silent = false
 var splash = null
 var output = null
 var csym = false
@@ -218,8 +241,12 @@ function process_args(cmd_args)
             case "-c"
                 no_run = true
             end
+            case "-s"
+                silent = true
+            end
             case "-r"
                 repl = true
+                ++index
                 break
             end
             case "-g"
@@ -276,7 +303,8 @@ function process_args(cmd_args)
         file_name = cmd_args[index++]
     end
     while index < cmd_args.size
-        arguments += " " + cmd_args[index++] 
+        arguments += " " + cmd_args[index]
+        args_arr.push_back(cmd_args[index++])
     end
 end
 
@@ -311,8 +339,27 @@ end
 function main(cmd_args)
     process_args(cmd_args)
     if repl
-        var instance = new repl
-        instance.run()
+        var instance = new repl_instance
+        instance.silent = silent
+        if unicode != null
+            var unicode_ext = context.import(runtime.get_import_path(), "unicode")
+            if unicode_ext == null
+                system.out.println("Error: unicode extension not installed yet.")
+                system.out.println("Run \'cspkg install extension --yes\' to enable unicode support.")
+                system.exit(0)
+            end
+            var cvt_name = unicode.toupper()
+            if !codecvt_map.exist(cvt_name)
+                system.out.println("Error: unknown unicode charset \"" + cvt_name + "\".")
+                system.exit(0)
+            end
+            instance.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
+            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(instance.unicode_cvt.local2wide(str)))
+        end
+        if csx_path != null
+            instance.codegen.ecsx_path = csx_path.split({system.path.delimiter})
+        end
+        instance.run(args_arr...)
         system.exit(0)
     end
     if !system.file.exist(file_name) || !match(regex.build(ecs_parser.grammar.ext), file_name)
