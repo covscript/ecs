@@ -43,8 +43,6 @@ function get_lexical(reg_builder)
     @end
 end
 
-var repl_hook = null
-
 @begin
 var covscript_syntax = {
     # Beginning of Parsing
@@ -61,12 +59,8 @@ var covscript_syntax = {
         {syntax.term(";")}
     )},
     # Bootstrap
-    "stmts" : null,
-    "stmts_norm" : {
+    "stmts" : {
         syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax.token("endl")))
-    },
-    "stmts_repl" : {
-        syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax.token("endl")), syntax.hook([](obj)->repl_hook(obj)))
     },
     "decl-stmts" : {
         syntax.repeat(syntax.ref("declaration"), syntax.repeat(syntax.token("endl")))
@@ -353,4 +347,3 @@ var grammar = new parsergen.grammar
 grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
 grammar.lex = get_lexical(regex.build)
 grammar.stx := covscript_syntax
-covscript_syntax.stmts = covscript_syntax.stmts_norm

@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.4.3
+# Bootstrap of Extended Covariant Script Generator v1.5.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.5.1"
+var wrapper_ver = "1.5.2"
 
 function show_version_simple()
 @begin
@@ -36,61 +36,29 @@ function show_version_simple()
 end
 
 class repl_instance
-    var syntax_stages = {"ignore", "nlook", "repeat", "optional", "cond_or"}.to_hash_set()
     var codegen = new ecs_generator.generator
-    var parser = new parsergen.repl_parser_type
+    var parser = new parsergen.partial_parser_type
     var unicode_cvt = null
-    var repl_impl = null
     var code_buff = new array
-    var stages = new array
+    var repl_impl = null
     var silent = false
-    function find_first_stage(parser)
-        foreach it in parser.stack
-            link name = it.product.root
-            if !syntax_stages.exist(name)
-                return name
-            end
-        end
-    end
-    function repl_hook(parser)
-        if !parser.eof()
-            return parsergen.parse_state.accept
-        end
-        if stages.size > 0
-            var tokens = null
-            loop
-                tokens = this.readline()
-            until tokens != null
-            foreach it in tokens do parser.lex.push_back(it)
-        end
-        return parsergen.parse_state.accept
-    end
     function on_eof_hook(parser)
-        stages.push_front(find_first_stage(parser))
         var tokens = null
         loop
-            tokens = this.readline()
+            tokens = this.readline("..> ")
         until tokens != null
         foreach it in tokens do parser.lex.push_back(it)
         return true
     end
-    function accept_hook(parser)
-        if !stages.empty() && find_first_stage(parser) == stages.front
-            stages.pop_front()
-        end
-    end
     function initialize()
-        ecs_parser.grammar.stx.stmts = ecs_parser.grammar.stx.stmts_repl
-        ecs_parser.repl_hook = repl_hook
         parser.on_eof_hook = on_eof_hook
-        parser.accept_hook = accept_hook
+        codegen.code_buff := code_buff
         codegen.file_name = "<REPL_ENV>"
         codegen.minmal = true
     end
-    function readline()
+    function readline(prompt)
         if !silent
-            foreach i in range(stages.size*2) do system.out.print(".")
-            system.out.print("> ")
+            system.out.print(prompt)
         end
         var line = repl_impl.readline()
         code_buff.push_back(line)
@@ -106,10 +74,10 @@ class repl_instance
         else
             lexer = new parsergen.lexer_type
         end
+        lexer.pos[1] = code_buff.size - 1
         var tokens = lexer.run(ecs_parser.grammar.lex, line)
         if !lexer.error_log.empty()
             parsergen.print_error("<REPL_ENV>", code_buff, lexer.error_log)
-            code_buff = new array
             return new array
         else
             return tokens
@@ -128,12 +96,11 @@ class repl_instance
         loop
             var tokens = null
             loop
-                tokens = this.readline()
+                tokens = this.readline("> ")
             until tokens != null
             if parser.run(ecs_parser.grammar.stx, tokens)
                 var ast = parser.production()
                 if ast != null
-                    codegen.code_buff = code_buff
                     var code = codegen.repl_run(ast)
                     if code != null
                         code = code.split({'\n'})
@@ -145,17 +112,13 @@ class repl_instance
                             end
                         catch e
                             system.out.println(e.what)
-                            stages = new array
                             repl_impl.reset()
                         end
                     end
-                    code_buff = new array
                 end
             else
                 var err = parser.get_log(0)
                 parsergen.print_error("<REPL_ENV>", {code_buff..., ""}, err)
-                code_buff = new array
-                stages = new array
                 repl_impl.reset()
             end
         end
