@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.5.2
+# Bootstrap of Extended Covariant Script Generator v1.5.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.5.2"
+var wrapper_ver = "1.5.3"
 
 function show_version_simple()
 @begin
@@ -45,7 +45,7 @@ class repl_instance
     function on_eof_hook(parser)
         var tokens = null
         loop
-            tokens = this.readline("..> ")
+            tokens = this.readline(".. ")
         until tokens != null
         foreach it in tokens do parser.lex.push_back(it)
         return true
@@ -57,10 +57,13 @@ class repl_instance
         codegen.minmal = true
     end
     function readline(prompt)
-        if !silent
-            system.out.print(prompt)
-        end
-        var line = repl_impl.readline()
+        var line = null
+        loop
+            if !silent
+                system.out.print(prompt)
+            end
+            line = repl_impl.readline()
+        until line != null
         code_buff.push_back(line)
         if line == "@exit"
             system.exit(0)
@@ -96,7 +99,7 @@ class repl_instance
         loop
             var tokens = null
             loop
-                tokens = this.readline("> ")
+                tokens = this.readline(">> ")
             until tokens != null
             if parser.run(ecs_parser.grammar.stx, tokens)
                 var ast = parser.production()
@@ -107,8 +110,12 @@ class repl_instance
                         try
                             foreach line in code
                                 if !repl_impl.exec(line)
-                                    system.exit(0)
+                                    repl_impl.reset()
+                                    break
                                 end
+                            end
+                            if repl_impl.has_exited()
+                                system.exit(0)
                             end
                         catch e
                             system.out.println(e.what)
