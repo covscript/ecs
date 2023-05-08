@@ -22,22 +22,30 @@ chmod +x ecs
 ## How to use
 `ecs` command is a compiler that will translate ECS to CovScript 3, but can use like an 'interpreter' (will compile your code before run automatically)
 ```
-Usage: ecs [options...] <FILE> [arguments...]
+Usage:
+    ecs [options...] <FILE> [arguments...]
+    ecs [options...]
 
-Options:
-    Option       Function
-   -h            Show help information
-   -v            Show version infomation
+Interpreter Options:
    -f            Disable compile cache
    -m            Disable beautify
    -c            Check grammar only
    -g            Generate cSYM info
    -d            Run debugger
-   -u <CHARSET>  Set unicode charset
-                 CHARSET = {"UTF8", "GBK"}
-   -i <PATH>     Set import path
    -o <PATH>     Set output path
    -- <ARGS>     Pass parameters to CovScript
+
+Interpreter REPL Options:
+   -s            Close the command prompt
+   -r <ARGS...>  Set arguments for REPL
+
+Common Options:
+    Option       Function
+   -h            Show help information
+   -v            Show version infomation
+   -u <CHARSET>  Set unicode charset
+                 CHARSET = {"AUTO", "UTF8", "GBK"}
+   -i <PATH>     Append import path
 
 ```
 ## Compatibility Notice
