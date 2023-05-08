@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.4.3
+# Bootstrap of Extended Covariant Script Generator v1.5.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,16 +21,121 @@
 package ecs_bootstrap
 
 import parsergen, ecs_parser, ecs_generator, codec, regex
+import sdk_extension as sdk
 
-var wrapper_ver = "1.4.3"
+var wrapper_ver = "1.5.4"
 
-function show_version()
+function show_version_simple()
 @begin
     system.out.println(
         "Version: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
         "Copyright (C) 2017-2023 Michael Lee. All rights reserved.\n" +
-        "Please visit http://covscript.org.cn/ for more information.\n\n" +
-        "Metadata:\n" +
+        "Please visit http://covscript.org.cn/ for more information."
+    )
+@end
+end
+
+class repl_instance
+    var codegen = new ecs_generator.generator
+    var parser = new parsergen.partial_parser_type
+    var unicode_cvt = null
+    var code_buff = new array
+    var repl_impl = null
+    var silent = false
+    function on_eof_hook(parser)
+        var tokens = null
+        loop
+            tokens = this.readline(".. ")
+        until tokens != null
+        foreach it in tokens do parser.lex.push_back(it)
+        return true
+    end
+    function initialize()
+        parser.on_eof_hook = on_eof_hook
+        codegen.code_buff := code_buff
+        codegen.file_name = "<REPL_ENV>"
+        codegen.minmal = true
+    end
+    function readline(prompt)
+        var line = null
+        loop
+            if !silent
+                system.out.print(prompt)
+            end
+            line = repl_impl.readline()
+        until line != null
+        code_buff.push_back(line)
+        if line == "@exit"
+            system.exit(0)
+        end
+        line += "\n"
+        var lexer = null
+        if unicode_cvt != null
+            lexer = new parsergen.unicode_lexer_type
+            lexer.cvt = unicode_cvt
+        else
+            lexer = new parsergen.lexer_type
+        end
+        lexer.pos[1] = code_buff.size - 1
+        var tokens = lexer.run(ecs_parser.grammar.lex, line)
+        if !lexer.error_log.empty()
+            parsergen.print_error("<REPL_ENV>", code_buff, lexer.error_log)
+            return new array
+        else
+            return tokens
+        end
+    end
+    function run(...args)
+        if !silent
+            system.out.println("Extended Covariant Script Interpreter REPL")
+            show_version_simple()
+        end
+        repl_impl = sdk.repl.create(args)
+        var header = codegen.repl_header().split({'\n'})
+        repl_impl.echo(false)
+        foreach line in header do repl_impl.exec(line)
+        repl_impl.echo(!silent)
+        loop
+            var tokens = null
+            loop
+                tokens = this.readline(">> ")
+            until tokens != null
+            if parser.run(ecs_parser.grammar.stx, tokens)
+                var ast = parser.production()
+                if ast != null
+                    var code = codegen.repl_run(ast)
+                    if code != null
+                        code = code.split({'\n'})
+                        try
+                            foreach line in code
+                                if !repl_impl.exec(line)
+                                    repl_impl.reset()
+                                    break
+                                end
+                            end
+                            if repl_impl.has_exited()
+                                system.exit(0)
+                            end
+                        catch e
+                            system.out.println(e.what)
+                            repl_impl.reset()
+                        end
+                    end
+                end
+            else
+                var err = parser.get_log(0)
+                parsergen.print_error("<REPL_ENV>", {code_buff..., ""}, err)
+                repl_impl.reset()
+            end
+        end
+    end
+end
+
+function show_version()
+    show_version_simple()
+@begin
+    system.out.println(
+        "\nMetadata:\n" +
         "  STD Version: " + ecs_generator.ecs_info.std_version + "\n"
     )
 @end
@@ -40,21 +145,27 @@ end
 function show_help()
 @begin
     system.out.println(
-        "Usage: ecs [options...] <FILE> [arguments...]\n\n" +
-        "Options:\n" +
-        "    Option       Function\n" +
-        "   -h            Show help information\n" +
-        "   -v            Show version infomation\n" +
+        "Usage:\n" +
+        "    ecs [options...] <FILE> [arguments...]\n" +
+        "    ecs [options...]\n\n" +
+        "Interpreter Options:\n" +
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
-        "   -u <CHARSET>  Set unicode charset\n" +
-        "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
-        "   -i <PATH>     Set import path\n" +
         "   -o <PATH>     Set output path\n" +
-        "   -- <ARGS>     Pass parameters to CovScript\n"
+        "   -- <ARGS>     Pass parameters to CovScript\n\n" +
+        "Interpreter REPL Options:\n" +
+        "   -s            Close the command prompt\n" +
+        "   -r <ARGS...>  Set arguments for REPL\n\n" +
+        "Common Options:\n" +
+        "    Option       Function\n" +
+        "   -h            Show help information\n" +
+        "   -v            Show version infomation\n" +
+        "   -u <CHARSET>  Set unicode charset\n" +
+        "                 CHARSET = {\"AUTO\", \"UTF8\", \"GBK\"}\n" +
+        "   -i <PATH>     Append import path\n"
     )
 @end
     system.exit(0)
@@ -63,15 +174,18 @@ end
 var compiler_args = new string
 var file_name = new string
 var arguments = new string
+var args_arr = new array
 var executor = "cs "
 var no_hash = false
 var csx_path = null
 var unicode = null
 var minmal = false
 var no_run = false
+var silent = false
 var splash = null
 var output = null
 var csym = false
+var repl = false
 
 function process_args(cmd_args)
     var index = 1
@@ -96,6 +210,14 @@ function process_args(cmd_args)
             case "-c"
                 no_run = true
             end
+            case "-s"
+                silent = true
+            end
+            case "-r"
+                repl = true
+                ++index
+                break
+            end
             case "-g"
                 no_hash = true
                 csym = true
@@ -116,7 +238,10 @@ function process_args(cmd_args)
                     system.out.println("Error: Option \"-u\" not completed. Usage: \"ecs -u <CHARSET>\"")
                     system.exit(0)
                 end
-                unicode = cmd_args[++index]
+                unicode = cmd_args[++index].toupper()
+                if unicode == "AUTO"
+                    unicode = system.is_platform_windows()?"GBK":"UTF8"
+                end
             end
             case "-i"
                 if index == cmd_args.size - 1
@@ -144,12 +269,14 @@ function process_args(cmd_args)
         ++index
     end
     if index == cmd_args.size
-        system.out.println("Error: no input file.")
-        system.exit(0)
+        repl = true
     end
-    file_name = cmd_args[index++]
+    if !repl
+        file_name = cmd_args[index++]
+    end
     while index < cmd_args.size
-        arguments += " " + cmd_args[index++] 
+        arguments += " " + cmd_args[index]
+        args_arr.push_back(cmd_args[index++])
     end
 end
 
@@ -183,6 +310,34 @@ end
 
 function main(cmd_args)
     process_args(cmd_args)
+    if repl
+        var instance = new repl_instance
+        instance.silent = silent
+        if unicode != null
+            var unicode_ext = context.import(runtime.get_import_path(), "unicode")
+            if unicode_ext == null
+                system.out.println("Error: unicode extension not installed yet.")
+                system.out.println("Run \'cspkg install extension --yes\' to enable unicode support.")
+                system.exit(0)
+            end
+            var cvt_name = unicode.toupper()
+            if cvt_name == "AUTO"
+                cvt_name = system.is_platform_windows()?"GBK":"UTF8"
+            end
+            if !codecvt_map.exist(cvt_name)
+                system.out.println("Error: unknown unicode charset \"" + cvt_name + "\".")
+                system.exit(0)
+            end
+            instance.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
+            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(instance.unicode_cvt.local2wide(str)), cvt_name)
+        end
+        if csx_path != null
+            sdk.set_import_path(runtime.get_import_path() + system.path.delimiter + csx_path)
+            instance.codegen.ecsx_path = csx_path.split({system.path.delimiter})
+        end
+        instance.run(args_arr...)
+        system.exit(0)
+    end
     if !system.file.exist(file_name) || !match(regex.build(ecs_parser.grammar.ext), file_name)
         system.out.println("Error: invalid input file.")
         system.exit(0)
@@ -217,7 +372,7 @@ function main(cmd_args)
             system.exit(0)
         end
         parser.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
-        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)))
+        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)), cvt_name)
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
