@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.5.3
+# Bootstrap of Extended Covariant Script Generator v1.5.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.5.3"
+var wrapper_ver = "1.5.4"
 
 function show_version_simple()
 @begin
@@ -71,7 +71,6 @@ class repl_instance
         line += "\n"
         var lexer = null
         if unicode_cvt != null
-            system.out.println("Unicode Enabled")
             lexer = new parsergen.unicode_lexer_type
             lexer.cvt = unicode_cvt
         else
@@ -165,8 +164,8 @@ function show_help()
         "   -h            Show help information\n" +
         "   -v            Show version infomation\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
-        "                 CHARSET = {\"UTF8\", \"GBK\"}\n" +
-        "   -i <PATH>     Set import path\n"
+        "                 CHARSET = {\"AUTO\", \"UTF8\", \"GBK\"}\n" +
+        "   -i <PATH>     Append import path\n"
     )
 @end
     system.exit(0)
@@ -239,7 +238,10 @@ function process_args(cmd_args)
                     system.out.println("Error: Option \"-u\" not completed. Usage: \"ecs -u <CHARSET>\"")
                     system.exit(0)
                 end
-                unicode = cmd_args[++index]
+                unicode = cmd_args[++index].toupper()
+                if unicode == "AUTO"
+                    unicode = system.is_platform_windows()?"GBK":"UTF8"
+                end
             end
             case "-i"
                 if index == cmd_args.size - 1
@@ -319,14 +321,18 @@ function main(cmd_args)
                 system.exit(0)
             end
             var cvt_name = unicode.toupper()
+            if cvt_name == "AUTO"
+                cvt_name = system.is_platform_windows()?"GBK":"UTF8"
+            end
             if !codecvt_map.exist(cvt_name)
                 system.out.println("Error: unknown unicode charset \"" + cvt_name + "\".")
                 system.exit(0)
             end
             instance.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
-            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(instance.unicode_cvt.local2wide(str)))
+            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(instance.unicode_cvt.local2wide(str)), cvt_name)
         end
         if csx_path != null
+            sdk.set_import_path(runtime.get_import_path() + system.path.delimiter + csx_path)
             instance.codegen.ecsx_path = csx_path.split({system.path.delimiter})
         end
         instance.run(args_arr...)
@@ -366,7 +372,7 @@ function main(cmd_args)
             system.exit(0)
         end
         parser.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
-        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)))
+        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)), cvt_name)
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
