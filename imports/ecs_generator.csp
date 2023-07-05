@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230502"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230701"
     constant std_version = "210605"
 end
 
@@ -76,7 +76,7 @@ class generator
     var target = system.out
     var is_package = false
     var ecs_discard = 0
-    var ecs_prefix = ""
+    var ecs_prefix = "__impl_"
     var stack = new array
     var slice_ext = false
     var minmal = false
@@ -1920,8 +1920,13 @@ class generator
         print_indent()
         println("var __ecs_catch__ = false", nodes.front.pos)
         print_indent()
-        println("if __ecs_except__.what == \"__ecs_except__\"", nodes.front.pos)
+        println("if __ecs_except__.what != \"__ecs_except__\"", nodes.front.pos)
         ++indent
+        print_indent()
+        println(ecs_prefix + "ecs.current_except = " + ecs_prefix + "ecs.param_new(" + ecs_prefix + "ecs.legacy_exception, {__ecs_except__.what})", nodes.front.pos)
+        --indent
+        print_indent()
+        println("end", nodes.front.pos)
         while typeid stack.front != typeid string || stack.front != "try"
             var dat = stack.pop_front()
             if dat.type == null
@@ -1951,15 +1956,12 @@ class generator
             print_indent()
             println("end", dat.pos)
         end
-        --indent
-        print_indent()
-        println("end", nodes.front.pos)
         if default_catch != null
             print_indent()
             println("if !__ecs_catch__", default_catch.pos)
             ++indent
             print_indent()
-            println("link " + default_catch.id + " = __ecs_except__", default_catch.pos)
+            println("var " + default_catch.id + " = " + ecs_prefix + "ecs.get_exception()", default_catch.pos)
             --indent
             this.visit_stmts(default_catch.body)
             print_indent()
@@ -2409,7 +2411,7 @@ class generator
         end
     end
     function repl_header()
-        return "import ecs\nimport sdk_extension as ecs_sdk\necs_sdk.extend_type(array, \"ecs_slice_ext\", ecs.ecs_slice_ext)"
+        return "import ecs as " + ecs_prefix + "ecs\nimport sdk_extension as ecs_sdk\necs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)"
     end
     function repl_run(ast)
         var buff = new iostream.char_buff
@@ -2457,11 +2459,7 @@ class generator
         foreach it in custom_header
             println(it, null)
         end
-        if is_package
-            println("import ecs as " + ecs_prefix + "ecs", null)
-        else
-            println("import ecs", null)
-        end
+        println("import ecs as " + ecs_prefix + "ecs", null)
         if slice_ext
             println("import sdk_extension as " + ecs_prefix + "ecs_sdk", null)
             println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)", null)

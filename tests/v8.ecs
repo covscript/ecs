@@ -1,0 +1,19 @@
+import ecs.exceptions.*
+try
+    {} => number
+catch e:invalid_type
+    system.out.println(e.what())
+    system.out.println("Pass")
+end
+try
+    {1, 2, 3, 4}[0:3:-1]
+catch e
+    system.out.println(e.what())
+    system.out.println("Pass")
+end
+try
+    "abcd" => number
+catch e:legacy_exception
+    system.out.println(e.what())
+    system.out.println("Pass")
+end

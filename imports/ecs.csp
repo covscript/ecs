@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.2.5
+# Extended Covariant Script Header: v1.3.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,16 @@ var special_type = {
 # Exceptions
 
 var current_except = null
+
+class legacy_exception
+    var error_text = new string
+    function construct(msg)
+        error_text = to_string(msg)
+    end
+    function what()
+        return error_text
+    end
+end
 
 function throw_exception(data)
     current_except = data
@@ -234,3 +244,9 @@ var internal_type = {
     "list", "hash_map", "hash_set"
 }.to_hash_set()
 @end
+
+namespace exceptions
+    link legacy_exception = global.legacy_exception
+    link slice_step_error = global.slice_step_error
+    link invalid_type = global.invalid_type
+end
