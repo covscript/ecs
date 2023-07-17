@@ -1,6 +1,3 @@
 .DS_Store
 .ecs_output/
-release/wix/bin/
-release/wix/imports/
-release/wix/ecs.csc
-release/wix/extended-covscript-x64.msi
+cspkg-repo/
