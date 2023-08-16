@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.0
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,7 +71,7 @@ var covscript_syntax = {
         syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax.token("endl")))
     },
     "decl-stmts" : {
-        syntax.repeat(syntax.ref("declaration"), syntax.repeat(syntax.token("endl")))
+        syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("declaration"), syntax.repeat(syntax.token("endl")))
     },
     "endblock" : {syntax.cond_or(
         {syntax.ref("end-stmt")},

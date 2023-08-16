@@ -40,8 +40,8 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230701"
-    constant std_version = "210605"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230801"
+    constant std_version = "210606"
 end
 
 import parsergen, ecs
@@ -1040,7 +1040,7 @@ class generator
                         end
                     end
                     if require_ver <= ecs_info.std_version
-                        println("@require: 210503", nodes.front.pos)
+                        println("@require: 210508", nodes.front.pos)
                         return
                     else
                         error(nodes.front.pos, "Newer Language Standard required: " + require_ver + ", now on " + ecs_info.std_version)
@@ -2156,23 +2156,19 @@ class generator
         var idx = 0
         if nodes.size > 1 && typeid nodes[1] == typeid parsergen.token_type && (nodes[1].data == "is" || nodes[1].data == "not")
             var type_id = get_id_of_equal_expr(nodes[2].nodes)
+            if nodes[1].data == "not"
+                target.print("!")
+            end
             if type_id != null && ecs.special_type.exist(type_id)
-                if nodes[1].data == "not"
-                    target.print("!")
-                end
                 target.print(ecs_prefix + "ecs.type_validator.__" + type_id + "(")
                 this.visit_relat_expr(nodes[0].nodes)
                 target.print(")")
             else
-                target.print("typeid(")
+                target.print("global.is_a(typeid(")
                 this.visit_relat_expr(nodes[0].nodes)
-                if nodes[1].data == "is"
-                    target.print(") == typeid(")
-                else
-                    target.print(") != typeid(")
-                end
+                target.print("), typeid(")
                 this.visit_equal_expr(nodes[2].nodes)
-                target.print(")")
+                target.print("))")
             end
         else
             # Recursive Visit relat-expr
