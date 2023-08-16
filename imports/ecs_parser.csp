@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.1
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -230,8 +230,16 @@ var covscript_syntax = {
     "expr" : {
         syntax.ref("basic-expr"), syntax.optional(syntax.term(","), syntax.ref("expr"))
     },
+    "bind-expr" : {
+        syntax.term("("), syntax.ref("bind-list"), syntax.repeat(syntax.term(","), syntax.ref("bind-list")), syntax.term(")")
+    },
+    "bind-list" : {syntax.cond_or(
+        {syntax.token("id")},
+        {syntax.term("...")},
+        {syntax.ref("bind-expr")}
+    )},
     "basic-expr" : {syntax.cond_or(
-        {syntax.ref("var-bind"), syntax.term("="), syntax.ref("cond-expr")},
+        {syntax.ref("bind-expr"), syntax.term("="), syntax.ref("cond-expr")},
         {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), syntax.ref("basic-expr"))}
     )},
     "asi-op" : {syntax.cond_or(

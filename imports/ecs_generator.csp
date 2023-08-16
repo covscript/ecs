@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230801"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230802"
     constant std_version = "210606"
 end
 
@@ -48,6 +48,10 @@ import parsergen, ecs
 
 struct module_type
     var list = new array
+end
+
+struct bind_discard
+    var id_counter = 0
 end
 
 struct lambda_type
@@ -428,6 +432,32 @@ class generator
             end
         end
     end
+    function visit_bind_list(nodes)
+        var idx = 0
+        # Condition
+        block
+            var matched = false
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id")
+                matched = true
+                # Visit id token
+                target.print(nodes[idx++].data)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "...")
+                matched = true
+                # Visit term "..."
+                ++idx; target.print(ecs_prefix + "ecs.discard[" + to_string(stack.front.id_counter++) + "]")
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "bind-expr")
+                matched = true
+                # Recursive Visit bind-expr
+                this.visit_bind_expr(nodes[idx++].nodes)
+            end
+            if !matched
+            	# Error
+            	return
+            end
+        end
+    end
     function visit_var_bind_list(nodes)
         var idx = 0
         # Condition
@@ -769,6 +799,30 @@ class generator
             	return
             end
         end
+    end
+    function visit_bind_expr(nodes)
+        var idx = 0
+        if !stack.empty() && typeid stack.front == typeid bind_discard
+            link old_value = stack.front.id_counter
+            stack.push_front(new bind_discard)
+            stack.front.id_counter := old_value
+        else
+            stack.push_front(new bind_discard)
+        end
+        # Visit term "("
+        ++idx; target.print("(")
+        # Recursive Visit bind-list
+        this.visit_bind_list(nodes[idx++].nodes)
+        # Repeat
+        while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ",")
+            # Visit term ","
+            ++idx; target.print(", ")
+            # Recursive Visit bind-list
+            this.visit_bind_list(nodes[idx++].nodes)
+        end
+        # Visit term ")"
+        ++idx; target.print(")")
+        stack.pop_front()
     end
     function visit_var_bind(nodes)
         var idx = 0
@@ -1143,10 +1197,10 @@ class generator
         # Condition
         block
             var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-bind")
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "bind-expr")
                 matched = true
-                # Recursive Visit var-bind
-                this.visit_var_bind(nodes[idx++].nodes)
+                # Recursive Visit bind-expr
+                this.visit_bind_expr(nodes[idx++].nodes)
                 # Visit term "="
                 ++idx; target.print(" = ")
                 # Recursive Visit cond-expr
