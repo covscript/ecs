@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Copyright (C) 2017-2024 Michael Lee(李登淳)
+# Copyright (C) 2017-2025 Michael Lee(李登淳)
 #
-# Email:   lee@unicov.cn, mikecovlee@163.com
+# Email:   mikecovlee@163.com
 # Github:  https://github.com/mikecovlee
 # Website: http://covscript.org.cn
 
@@ -29,7 +29,7 @@ function show_version_simple()
 @begin
     system.out.println(
         "Version: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
-        "Copyright (C) 2017-2024 Michael Lee. All rights reserved.\n" +
+        "Copyright (C) 2017-2025 Michael Lee. All rights reserved.\n" +
         "Please visit http://covscript.org.cn/ for more information."
     )
 @end
@@ -229,7 +229,7 @@ function process_args(cmd_args)
                 @begin
                 splash =
                     "Extended Covariant Script Debugger\nVersion: " + ecs_generator.ecs_info.version + ", Wrapper " + wrapper_ver + "\n" +
-                    "Copyright (C) 2017-2024 Michael Lee. All rights reserved.\n" +
+                    "Copyright (C) 2017-2025 Michael Lee. All rights reserved.\n" +
                     "Please visit <http://covscript.org.cn/> for more information."
                 @end
             end
