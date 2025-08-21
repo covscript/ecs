@@ -40,8 +40,8 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 230802"
-    constant std_version = "210606"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 250801"
+    constant std_version = "210607"
 end
 
 import parsergen, ecs
@@ -2218,11 +2218,11 @@ class generator
                 this.visit_relat_expr(nodes[0].nodes)
                 target.print(")")
             else
-                target.print("global.is_a(typeid(")
+                target.print(ecs_prefix + "ecs.general_is(")
                 this.visit_relat_expr(nodes[0].nodes)
-                target.print("), typeid(")
+                target.print(", ")
                 this.visit_equal_expr(nodes[2].nodes)
-                target.print("))")
+                target.print(")")
             end
         else
             # Recursive Visit relat-expr

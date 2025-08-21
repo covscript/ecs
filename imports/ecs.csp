@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.3.1
+# Extended Covariant Script Header: v1.3.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -122,6 +122,21 @@ end
 function check_type(name, id, type)
     if typeid id != typeid type
         throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
+    end
+end
+
+function general_is(lhs, rhs)
+    if type_validator.__type(rhs)
+        if typeid lhs != typeid rhs
+            return global.is_a(typeid lhs, typeid rhs)
+        else
+            return true
+        end
+    end
+    if type_validator.__type(lhs)
+        throw throw_exception(runtime.exception("Can not compare type with non-type objects."))
+    else
+        return lhs == rhs
     end
 end
 
