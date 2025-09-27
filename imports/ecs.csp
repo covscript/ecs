@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.3.2
+# Extended Covariant Script Header: v1.3.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -155,7 +155,7 @@ class slice_step_error
     end
 end
 
-function ecs_slice_ext(arr, beg, end, step)
+function ecs_slice_array_ext(arr, beg, end, step)
     var range_begin = 0, range_end = arr.size - 1, range_step = 1
     var slice_data = new array
     if beg != null
@@ -185,6 +185,42 @@ function ecs_slice_ext(arr, beg, end, step)
         end
         while range_begin <= range_end
             slice_data.push_back(arr[range_begin])
+            range_begin += range_step
+        end
+    end
+    return move(slice_data)
+end
+
+function ecs_slice_string_ext(str, beg, end, step)
+    var range_begin = 0, range_end = str.size - 1, range_step = 1
+    var slice_data = new string
+    if beg != null
+        range_begin = beg
+    end
+    if end != null
+        range_end = end
+    end
+    if step == null
+        if range_begin > range_end
+            range_step = -1
+        end
+    else
+        range_step = step
+    end
+    if range_begin > range_end
+        if range_step >= 0
+            throw_exception(param_new(slice_step_error, {"Use positive step in negative range."}))
+        end
+        while range_begin >= range_end
+            slice_data.append(str[range_begin])
+            range_begin += range_step
+        end
+    else
+        if range_step <= 0
+            throw_exception(param_new(slice_step_error, {"Use negative step in positive range."}))
+        end
+        while range_begin <= range_end
+            slice_data.append(str[range_begin])
             range_begin += range_step
         end
     end

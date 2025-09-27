@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 250801"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 250802"
     constant std_version = "210607"
 end
 
@@ -2461,7 +2461,11 @@ class generator
         end
     end
     function repl_header()
-        return "import ecs as " + ecs_prefix + "ecs\nimport sdk_extension as ecs_sdk\necs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)"
+        @begin
+        return "import ecs as " + ecs_prefix + "ecs\nimport sdk_extension as ecs_sdk\n" +
+            "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_array_ext)\n" +
+            "ecs_sdk.extend_type(string, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_string_ext)"
+        @end
     end
     function repl_run(ast)
         var buff = new iostream.char_buff
@@ -2512,7 +2516,8 @@ class generator
         println("import ecs as " + ecs_prefix + "ecs", null)
         if slice_ext
             println("import sdk_extension as " + ecs_prefix + "ecs_sdk", null)
-            println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_ext)", null)
+            println(ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_array_ext)", null)
+            println(ecs_prefix + "ecs_sdk.extend_type(string, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_string_ext)", null)
         end
         gen_internal()
         lambda_list = new array
