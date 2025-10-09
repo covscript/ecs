@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.5.4
+# Bootstrap of Extended Covariant Script Generator v1.5.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.5.4"
+var wrapper_ver = "1.5.5"
 
 function show_version_simple()
 @begin
@@ -350,7 +350,12 @@ function main(cmd_args)
             if system.file.exist("./.ecs_output/" + file_hash)
                 var ifs = iostream.ifstream("./.ecs_output/" + file_hash)
                 var name = ifs.getline()
-                var mtime = ifs.getline().to_number()
+                var mtime = null
+                try
+                    mtime = ifs.getline().to_number()
+                catch e
+                    mtime = -1
+                end
                 if mtime == system.file.mtime(file_name)
                     system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments)))
                 end
