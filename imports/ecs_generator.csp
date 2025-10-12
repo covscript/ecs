@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 250802"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 251001"
     constant std_version = "210607"
 end
 
@@ -692,7 +692,7 @@ class generator
                             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
                                 matched = true
                                 # Visit term "gcnew"
-                                ++idx; target.print(ecs_prefix + "&ecs.type_constructor.__" + id + "(")
+                                ++idx; target.print("&" + ecs_prefix + "ecs.type_constructor.__" + id + "(")
                             end
                             if !matched
                                 # Error
@@ -2053,7 +2053,7 @@ class generator
             link map = stack.front.second
             if map.exist("pass-by-value")
                 print_indent()
-                println(stack.front.first + " := clone(" + stack.front.first + ")", nodes.front.pos)
+                println("context.unlink_var(\"" + stack.front.first + "\")", nodes.front.pos)
             end
             if map.exist("check-type")
                 print_indent()
@@ -2429,7 +2429,7 @@ class generator
                 link map = it.second
                 if map.exist("pass-by-value")
                     print_indent()
-                    println(it.first + " := clone(" + it.first + ")", dat.pos)
+                    println("context.unlink_var(\"" + it.first + "\")", dat.pos)
                 end
                 if map.exist("check-type")
                     print_indent()

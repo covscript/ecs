@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.5.5"
+var wrapper_ver = "1.5.6"
 
 function show_version_simple()
 @begin
@@ -287,8 +287,8 @@ var codecvt_map = {
 }.to_hash_map()
 @end
 
-var ecs_reg = regex.build("^(.*)\\.ecs$")
-var lcs_reg = regex.build("^(.*)\\.(csc|csp)$")
+var ecs_reg = regex.build_optimize("^(.*)\\.ecs$")
+var lcs_reg = regex.build_optimize("^(.*)\\.(csc|csp)$")
 
 function match(reg, str)
     return !reg.match(str).empty()
@@ -329,7 +329,7 @@ function main(cmd_args)
                 system.exit(0)
             end
             instance.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
-            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(instance.unicode_cvt.local2wide(str)), cvt_name)
+            ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(instance.unicode_cvt.local2wide(str)), cvt_name)
         end
         if csx_path != null
             sdk.set_import_path(runtime.get_import_path() + system.path.delimiter + csx_path)
@@ -377,7 +377,7 @@ function main(cmd_args)
             system.exit(0)
         end
         parser.unicode_cvt = codecvt_map.at(cvt_name)(unicode_ext)
-        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_wregex(parser.unicode_cvt.local2wide(str)), cvt_name)
+        ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(parser.unicode_cvt.local2wide(str)), cvt_name)
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)

@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.2
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.3
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -361,5 +361,5 @@ var covscript_syntax = {
 
 var grammar = new parsergen.grammar
 grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
-grammar.lex = get_lexical(regex.build, "ASCII")
+grammar.lex = get_lexical(regex.build_optimize, "ASCII")
 grammar.stx := covscript_syntax
