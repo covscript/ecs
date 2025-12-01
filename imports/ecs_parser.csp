@@ -1,4 +1,4 @@
-# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.4
+# Covariant Script Parser Generator: Grammar of Extended CovScript(ECS Lang) v1.3.5
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,19 +24,11 @@ import parsergen, regex
 
 constant syntax = parsergen.syntax
 
-@begin
-var id_lexcicals = {
-    "ASCII" : "^[A-Za-z_]\\w*$",
-    "UTF8"  : "^[A-Za-z_\\u4E00-\\u9FA5\\u9FA6-\\u9FEF\\u3007](\\w|[\\u4E00-\\u9FA5\\u9FA6-\\u9FEF\\u3007])*$",
-    "GBK"   : "^[A-Za-z_\\uB0A1-\\uF7FE\\u8140-\\uA0FE\\uAA40-\\uFEA0\\uA996](\\w|[\\uB0A1-\\uF7FE\\u8140-\\uA0FE\\uAA40-\\uFEA0\\uA996])*$"
-}.to_hash_map()
-@end
-
-function get_lexical(reg_builder, cvt_name)
+function get_lexical(reg_builder)
     @begin
     return {
         "endl" : reg_builder("^\\n+$"),
-        "id" :   reg_builder(id_lexcicals.at(cvt_name)),
+        "id" :   reg_builder("^[A-Za-z_\\p{Han}](\\w|\\p{Han})*$"),
         "num" :  reg_builder("^[0-9]+\\.?([0-9]+)?$"),
         "str" :  reg_builder("^(\"|\"([^\"]|\\\\\")*\"?)$"),
         "char" : reg_builder("^(\'|\'([^\']|\\\\(0|\\\\|\'|\"|\\w))\'?)$"),
@@ -361,5 +353,5 @@ var covscript_syntax = {
 
 var grammar = new parsergen.grammar
 grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
-grammar.lex = get_lexical(regex.build_optimize, "ASCII")
+grammar.lex = get_lexical(regex.build_optimize)
 grammar.stx := covscript_syntax
