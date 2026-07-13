@@ -63,8 +63,8 @@ jobs:
           OS="${{ steps.platform.outputs.os }}"
           ARCH="${{ steps.platform.outputs.arch }}"
           BASE="https://github.com/covscript/csbuild/releases/download/${OS}-schedule"
-          COV="covscript-${OS}-${ARCH}.7z"
-          PKG="cspkg-${OS}-${ARCH}.7z"
+          COV="covscript-${OS}-${ARCH}-nightly.7z"
+          PKG="cspkg-${OS}-${ARCH}-nightly.7z"
 
           echo "Downloading ${COV}..."
           curl -fsSL -o covscript.7z "${BASE}/${COV}"
