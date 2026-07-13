@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main, improve/*]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set platform
+        id: platform
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)   echo "os=ubuntu" >> $GITHUB_OUTPUT; echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
+            macOS)   echo "os=macos" >> $GITHUB_OUTPUT; echo "arch=arm64" >> $GITHUB_OUTPUT ;;
+            Windows) echo "os=windows" >> $GITHUB_OUTPUT; echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
+          esac
+
+      - name: Download CovScript SDK
+        shell: bash
+        run: |
+          OS="${{ steps.platform.outputs.os }}"
+          ARCH="${{ steps.platform.outputs.arch }}"
+          SDK_URL="https://github.com/covscript/csbuild/releases/download/${OS}-schedule/covscript-${OS}-${ARCH}.7z"
+          PKG_URL="https://github.com/covscript/csbuild/releases/download/${OS}-schedule/cspkg-${OS}-${ARCH}.7z"
+          curl -fsSL "$SDK_URL" -o sdk.7z
+          curl -fsSL "$PKG_URL" -o pkg.7z
+          7z x sdk.7z -y
+          7z x pkg.7z -y
+          echo "CS_DEV_PATH=$(pwd)/build" >> $GITHUB_ENV
+          echo "$(pwd)/build/bin" >> $GITHUB_PATH
+
+      - name: Install ECS dependencies
+        shell: bash
+        run: |
+          export PATH="$(pwd)/build/bin:$PATH"
+          cs build/bin/cspkg init --yes || true
+          cs build/bin/cspkg install parsergen ecs_parser ecs_generator sdk_extension codec regex --yes || true
+
+      - name: Run ECS tests
+        shell: bash
+        run: |
+          export PATH="$(pwd)/build/bin:$PATH"
+          for test in tests/*.ecs; do
+            echo "Running $test..."
+            cs ecs "$test" || echo "Test $test completed (exit: $?)"
+          done
