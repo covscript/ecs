@@ -1,3 +1,11 @@
+# CI for ecs (Extended Covariant Script / CovScript 4)
+#
+# ecs is a CovScript-to-CovScript transpiler. This CI:
+#   1. Downloads a pre-built CovScript SDK from csbuild releases
+#   2. Configures cspkg to use the bundled package repository
+#   3. Installs ecs_bootstrap (which pulls parsergen, ecs_parser, ecs_generator, etc.)
+#   4. Runs the ecs transpiler on each test file in tests/
+
 name: CI
 
 on:
@@ -20,45 +28,122 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2022]
 
     steps:
+      # ------------------------------------------------------------------ #
+      # 1. Check out this repo                                              #
+      # ------------------------------------------------------------------ #
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Set platform
+      # ------------------------------------------------------------------ #
+      # 2. Set platform identifiers                                         #
+      # ------------------------------------------------------------------ #
+      - name: Set platform identifiers
         id: platform
         shell: bash
         run: |
           case "${{ runner.os }}" in
-            Linux)   echo "os=ubuntu" >> $GITHUB_OUTPUT; echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
-            macOS)   echo "os=macos" >> $GITHUB_OUTPUT; echo "arch=arm64" >> $GITHUB_OUTPUT ;;
-            Windows) echo "os=windows" >> $GITHUB_OUTPUT; echo "arch=x86_64" >> $GITHUB_OUTPUT ;;
+            Linux)   echo "os=ubuntu" >> "$GITHUB_OUTPUT"
+                     echo "arch=x86_64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=amd64" >> "$GITHUB_OUTPUT" ;;
+            macOS)   echo "os=macos" >> "$GITHUB_OUTPUT"
+                     echo "arch=arm64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=arm64" >> "$GITHUB_OUTPUT" ;;
+            Windows) echo "os=windows" >> "$GITHUB_OUTPUT"
+                     echo "arch=x86_64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=amd64" >> "$GITHUB_OUTPUT" ;;
           esac
 
-      - name: Download CovScript SDK
+      # ------------------------------------------------------------------ #
+      # 3. Download CovScript SDK + cspkg repository                        #
+      # ------------------------------------------------------------------ #
+      - name: Download CovScript SDK and cspkg repo
+        id: sdk
         shell: bash
         run: |
           OS="${{ steps.platform.outputs.os }}"
           ARCH="${{ steps.platform.outputs.arch }}"
-          SDK_URL="https://github.com/covscript/csbuild/releases/download/${OS}-schedule/covscript-${OS}-${ARCH}.7z"
-          PKG_URL="https://github.com/covscript/csbuild/releases/download/${OS}-schedule/cspkg-${OS}-${ARCH}.7z"
-          curl -fsSL "$SDK_URL" -o sdk.7z
-          curl -fsSL "$PKG_URL" -o pkg.7z
-          7z x sdk.7z -y
-          7z x pkg.7z -y
-          echo "CS_DEV_PATH=$(pwd)/build" >> $GITHUB_ENV
-          echo "$(pwd)/build/bin" >> $GITHUB_PATH
+          BASE="https://github.com/covscript/csbuild/releases/download/${OS}-schedule"
+          COV="covscript-${OS}-${ARCH}.7z"
+          PKG="cspkg-${OS}-${ARCH}.7z"
 
-      - name: Install ECS dependencies
+          echo "Downloading ${COV}..."
+          curl -fsSL -o covscript.7z "${BASE}/${COV}"
+          echo "Downloading ${PKG}..."
+          curl -fsSL -o cspkg.7z "${BASE}/${PKG}"
+
+          7z x covscript.7z -y
+          mv build covscript-home
+          7z x cspkg.7z -y
+
+          CS_HOME="${{ github.workspace }}/covscript-home"
+          CS_HOME="${CS_HOME//\\//}"
+          echo "cs_home=${CS_HOME}" >> "$GITHUB_OUTPUT"
+
+          echo "=== covscript-home/bin ==="
+          ls covscript-home/bin/
+
+      # ------------------------------------------------------------------ #
+      # 4. Configure cspkg                                                  #
+      # ------------------------------------------------------------------ #
+      - name: Configure cspkg
         shell: bash
         run: |
-          export PATH="$(pwd)/build/bin:$PATH"
-          cs build/bin/cspkg init --yes || true
-          cs build/bin/cspkg install parsergen ecs_parser ecs_generator sdk_extension codec regex --yes || true
+          mkdir -p "$HOME/.cspkg"
 
+          CS_HOME="${{ steps.sdk.outputs.cs_home }}"
+          WS="${{ github.workspace }}"
+          WS="${WS//\\//}"
+
+          if [[ "$WS" =~ ^[A-Za-z]:/ ]]; then
+            SOURCE_URL="file:///${WS}/cspkg-repo/"
+          else
+            SOURCE_URL="file://${WS}/cspkg-repo/"
+          fi
+
+          cat > "$HOME/.cspkg/config.json" << EOF
+          {
+            "arch": "${{ steps.platform.outputs.cspkg_arch }}",
+            "home": "${CS_HOME}",
+            "source": "${SOURCE_URL}",
+            "timeout_ms": 3000
+          }
+          EOF
+
+          echo "=== cspkg config ==="
+          cat "$HOME/.cspkg/config.json"
+
+      # ------------------------------------------------------------------ #
+      # 5. Setup environment                                                #
+      # ------------------------------------------------------------------ #
+      - name: Setup environment
+        shell: bash
+        run: |
+          CS_HOME="${{ steps.sdk.outputs.cs_home }}"
+          echo "COVSCRIPT_HOME=${CS_HOME}" >> "$GITHUB_ENV"
+          echo "${CS_HOME}/bin" >> "$GITHUB_PATH"
+
+      # ------------------------------------------------------------------ #
+      # 6. Install ecs_bootstrap and dependencies via cspkg                  #
+      # ------------------------------------------------------------------ #
+      - name: Install ecs_bootstrap
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod -R +x "$COVSCRIPT_HOME/bin/"
+          fi
+          cspkg install --import --yes
+          cspkg install ecs_bootstrap --yes
+          cspkg list
+
+      # ------------------------------------------------------------------ #
+      # 7. Run ECS transpiler on test files                                  #
+      # ------------------------------------------------------------------ #
       - name: Run ECS tests
         shell: bash
         run: |
-          export PATH="$(pwd)/build/bin:$PATH"
+          set -e
           for test in tests/*.ecs; do
-            echo "Running $test..."
-            cs ecs "$test" || echo "Test $test completed (exit: $?)"
+            echo "=== Running $test ==="
+            ecs "$test"
+            echo "  -> OK"
           done
