@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.3.3
+# Extended Covariant Script Header: v1.3.4
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Copyright (C) 2017-2025 Michael Lee(李登淳)
+# Copyright (C) 2017-2026 Michael Lee(李登淳)
 #
 # Email:   mikecovlee@163.com
 # Github:  https://github.com/mikecovlee
@@ -141,6 +141,9 @@ function general_is(lhs, rhs)
 end
 
 function init_lambda(...args)
+    if args.empty()
+        throw throw_exception(runtime.exception("Invalid lambda initialization: no function provided."))
+    end
     link func = args.pop_front()
     return param_new(func, args).call
 end
@@ -156,12 +159,19 @@ class slice_step_error
 end
 
 function ecs_slice_array_ext(arr, beg, end, step)
-    var range_begin = 0, range_end = arr.size - 1, range_step = 1
+    var arr_size = arr.size
+    var range_begin = 0, range_end = arr_size - 1, range_step = 1
     var slice_data = new array
     if beg != null
+        if beg < -arr_size
+            throw_exception(param_new(slice_step_error, {"Slice begin index out of range."}))
+        end
         range_begin = beg
     end
     if end != null
+        if end < -arr_size
+            throw_exception(param_new(slice_step_error, {"Slice end index out of range."}))
+        end
         range_end = end
     end
     if step == null
@@ -192,12 +202,19 @@ function ecs_slice_array_ext(arr, beg, end, step)
 end
 
 function ecs_slice_string_ext(str, beg, end, step)
-    var range_begin = 0, range_end = str.size - 1, range_step = 1
+    var str_size = str.size
+    var range_begin = 0, range_end = str_size - 1, range_step = 1
     var slice_data = new string
     if beg != null
+        if beg < -str_size
+            throw_exception(param_new(slice_step_error, {"Slice begin index out of range."}))
+        end
         range_begin = beg
     end
     if end != null
+        if end < -str_size
+            throw_exception(param_new(slice_step_error, {"Slice end index out of range."}))
+        end
         range_end = end
     end
     if step == null

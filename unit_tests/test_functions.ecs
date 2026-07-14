@@ -1,0 +1,87 @@
+# Unit tests: Functions, arguments, returns, type annotations
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- basic function ----
+function add(a, b)
+    return a + b
+end
+assert_eq(add(3, 4), 7, "basic function add(3,4)")
+
+# ---- function with type annotation ----
+function greet(name : string)
+    return "Hello, " + name
+end
+assert_eq(greet("World"), "Hello, World", "function with string param")
+
+# ---- function with number type check ----
+function double(x : number)
+    return x * 2
+end
+assert_eq(double(21), 42, "function with number param")
+
+# ---- return from nested scope ----
+function early_return(x)
+    if x < 0
+        return -1
+    end
+    return x + 1
+end
+assert_eq(early_return(-5), -1, "early return on negative")
+assert_eq(early_return(3), 4, "normal return on positive")
+
+# ---- function with no args ----
+function answer()
+    return 42
+end
+assert_eq(answer(), 42, "function with no args")
+
+# ---- recursive function ----
+function factorial(n)
+    if n <= 1
+        return 1
+    end
+    return n * factorial(n - 1)
+end
+assert_eq(factorial(5), 120, "recursive factorial(5)")
+
+# ---- function with override ----
+struct Base
+    function value()
+        return 1
+    end
+end
+struct Derived extends Base
+    function value() override
+        return 2
+    end
+end
+var d = new Derived{}
+assert_eq(d.value(), 2, "override method returns 2")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: functions  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

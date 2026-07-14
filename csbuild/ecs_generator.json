@@ -3,7 +3,7 @@
     "Name": "ecs_generator",
     "Info": "Extended CovScript(ECS Lang) Generator",
     "Author": "Michael Lee",
-    "Version": "4.0.0b-251001",
+    "Version": "4.0.0b-260714",
     "Target": "imports/ecs_generator.csp",
     "Dependencies": [
         "parsergen",

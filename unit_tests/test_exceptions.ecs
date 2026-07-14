@@ -1,0 +1,102 @@
+# Unit tests: Exception handling (try/catch, throw, typed catch)
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- throw and catch ECS exception ----
+class MyError
+    var msg = new string
+    function construct(m)
+        msg = m
+    end
+    function what()
+        return msg
+    end
+end
+
+var caught = false
+var error_msg = ""
+try
+    throw new MyError{"test error"}
+catch e : MyError
+    caught = true
+    error_msg = e.msg
+end
+assert(caught, "catch typed exception (MyError)")
+assert(error_msg == "test error", "exception message preserved")
+
+# ---- typed catch with multiple handlers ----
+caught = false
+var handler = ""
+try
+    throw new MyError{"oops"}
+catch e : ecs.invalid_type
+    handler = "wrong_handler"
+catch e : MyError
+    caught = true
+    handler = "correct_handler"
+end
+assert(caught, "catch correct handler in multi-catch")
+assert(handler == "correct_handler", "correct handler selected")
+
+# ---- generic catch ----
+caught = false
+try
+    throw new MyError{"any error"}
+catch e
+    caught = true
+end
+assert(caught, "generic catch works")
+
+# ---- rethrow (typed catch propagates) ----
+var rethrown = false
+try
+    try
+        throw new MyError{"inner"}
+    catch e
+        throw
+    end
+catch e
+    rethrown = true
+end
+assert(rethrown, "rethrow propagates to outer catch")
+
+# ---- no exception thrown ----
+var clean = true
+try
+    var x = 1 + 1
+catch e
+    clean = false
+end
+assert(clean, "no exception in try block")
+
+# ---- exception types accessible via ecs namespace ----
+assert(ecs.invalid_type is type, "ecs.invalid_type is type")
+assert(ecs.slice_step_error is type, "ecs.slice_step_error is type")
+assert(ecs.legacy_exception is type, "ecs.legacy_exception is type")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: exceptions  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

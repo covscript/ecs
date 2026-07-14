@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Copyright (C) 2017-2025 Michael Lee(李登淳)
+# Copyright (C) 2017-2026 Michael Lee(李登淳)
 #
 # Email:   mikecovlee@163.com
 # Github:  https://github.com/mikecovlee
@@ -40,8 +40,9 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 251001"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 260714"
     constant std_version = "210607"
+    constant min_runtime = "210508"
 end
 
 import parsergen, ecs
@@ -117,40 +118,27 @@ class generator
         end
     end
     function get_id_of_visit_expr(nodes)
-        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "object"
-            nodes := nodes[0].nodes
-            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "element"
-                nodes := nodes[0].nodes
-                if nodes.size == 1 && typeid nodes[0] == typeid parsergen.token_type && nodes[0].type == "id"
-                    return nodes[0].data
-                end
+        var chain = {"object", "element"}
+        foreach root in chain
+            if nodes.size != 1 || typeid nodes[0] != typeid parsergen.syntax_tree || nodes[0].root != root
+                return null
             end
+            nodes := nodes[0].nodes
+        end
+        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.token_type && nodes[0].type == "id"
+            return nodes[0].data
         end
         return null
     end
     function get_id_of_equal_expr(nodes)
-        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "relat-expr"
-            nodes := nodes[0].nodes
-            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "add-expr"
-                nodes := nodes[0].nodes
-                if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "mul-expr"
-                    nodes := nodes[0].nodes
-                    if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "conv-expr"
-                        nodes := nodes[0].nodes
-                        if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "unary-expr"
-                            nodes := nodes[0].nodes
-                            if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "prim-expr"
-                                nodes := nodes[0].nodes
-                                if nodes.size == 1 && typeid nodes[0] == typeid parsergen.syntax_tree && nodes[0].root == "visit-expr"
-                                    return get_id_of_visit_expr(nodes[0].nodes)
-                                end
-                            end
-                        end
-                    end
-                end
+        var chain = {"relat-expr", "add-expr", "mul-expr", "conv-expr", "unary-expr", "prim-expr", "visit-expr"}
+        foreach root in chain
+            if nodes.size != 1 || typeid nodes[0] != typeid parsergen.syntax_tree || nodes[0].root != root
+                return null
             end
+            nodes := nodes[0].nodes
         end
-        return null
+        return get_id_of_visit_expr(nodes)
     end
     function gen_unique_discard_id()
         return "__ecs_discard_" + ecs_prefix + to_string(++ecs_discard) + "__"
@@ -544,53 +532,25 @@ class generator
     end
     function visit_for_body(nodes, header_pos)
         var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "do")
-                matched = true
-                # Visit term "do"
-                ++idx; target.print(" do ")
-                # Recursive Visit basic-expr
-                this.visit_basic_expr(nodes[idx++].nodes)
-                # Recursive Visit endline
-                this.visit_endline(nodes[idx++].nodes)
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                matched = true
-                # Visit endl token
-                ++idx; println("", header_pos)
-                # Recursive Visit stmts
-                this.visit_stmts(nodes[idx++].nodes)
-                # Visit term "end"
-                print_indent()
-                println("end", {0, nodes.back.pos[1] - 1})
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "do"
+            # Single-expression body: "do <expr>"
+            ++idx; target.print(" do ")
+            this.visit_basic_expr(nodes[idx++].nodes)
+            this.visit_endline(nodes[idx++].nodes)
+        else
+            # Block body: stmts... end
+            ++idx; println("", header_pos)
+            this.visit_stmts(nodes[idx++].nodes)
+            print_indent()
+            println("end", {0, nodes.back.pos[1] - 1})
         end
     end
     function visit_class_stmt(nodes)
         var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "class")
-                matched = true
-                # Visit term "class"
-                ++idx; target.print("class ")
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "struct")
-                matched = true
-                # Visit term "struct"
-                ++idx; target.print("struct ")
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "class"
+            ++idx; target.print("class ")
+        else
+            ++idx; target.print("struct ")
         end
         # Visit id token
         target.print(nodes[idx++].data)
@@ -677,79 +637,28 @@ class generator
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
                 matched = true
-                # Optional
-                if nodes.size > 2 && (typeid nodes[2] == typeid parsergen.syntax_tree && nodes[2].root == "array")
-                    var id = get_id_of_visit_expr(nodes[1].nodes)
+                var is_gcnew = nodes[idx].data == "gcnew"
+                ++idx
+                if idx + 1 < nodes.size && (typeid nodes[idx + 1] == typeid parsergen.syntax_tree && nodes[idx + 1].root == "array")
+                    # new/gcnew with constructor arguments
+                    var id = get_id_of_visit_expr(nodes[idx].nodes)
                     if id != null && ecs.internal_type.exist(id)
-                        # Condition
-                        block
-                            var matched = false
-                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
-                                matched = true
-                                # Visit term "new"
-                                ++idx; target.print(ecs_prefix + "ecs.type_constructor.__" + id + "(")
-                            end
-                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
-                                matched = true
-                                # Visit term "gcnew"
-                                ++idx; target.print("&" + ecs_prefix + "ecs.type_constructor.__" + id + "(")
-                            end
-                            if !matched
-                                # Error
-                                return
-                            end
-                        end
-                        # Recursive Visit visit-expr
-                        idx++
-                        # Recursive Visit array
+                        # Internal type: use type_constructor
+                        target.print((is_gcnew ? "&" : "") + ecs_prefix + "ecs.type_constructor.__" + id + "(")
+                        ++idx
                         this.visit_array(nodes[idx++].nodes)
                         target.print("...)")
                     else
-                        # Condition
-                        block
-                            var matched = false
-                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
-                                matched = true
-                                # Visit term "new"
-                                ++idx; target.print(ecs_prefix + "ecs.param_new(")
-                            end
-                            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
-                                matched = true
-                                # Visit term "gcnew"
-                                ++idx; target.print(ecs_prefix + "ecs.param_gcnew(")
-                            end
-                            if !matched
-                                # Error
-                                return
-                            end
-                        end
-                        # Recursive Visit visit-expr
+                        # User-defined type: use param_new/param_gcnew
+                        target.print(ecs_prefix + (is_gcnew ? "ecs.param_gcnew(" : "ecs.param_new("))
                         this.visit_visit_expr(nodes[idx++].nodes)
                         target.print(", ")
-                        # Recursive Visit array
                         this.visit_array(nodes[idx++].nodes)
                         target.print(")")
                     end
                 else
-                    # Condition
-                    block
-                        var matched = false
-                        if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new")
-                            matched = true
-                            # Visit term "new"
-                            ++idx; target.print("new ")
-                        end
-                        if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
-                            matched = true
-                            # Visit term "gcnew"
-                            ++idx; target.print("gcnew ")
-                        end
-                        if !matched
-                            # Error
-                            return
-                        end
-                    end
-                    # Recursive Visit visit-expr
+                    # new/gcnew without constructor arguments
+                    target.print(is_gcnew ? "gcnew " : "new ")
                     this.visit_visit_expr(nodes[idx++].nodes)
                 end
             end
@@ -1044,40 +953,22 @@ class generator
     end
     function visit_lambda_body(nodes)
         var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{")
-                matched = true
-                # Visit term "{"
-                ++idx
-                # Repeat
-                while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "statement")
-                    if stack.front.body_stmts == null
-                        stack.front.body_stmts = new array
-                    end
-                    # Recursive Visit statement
-                    stack.front.body_stmts.push_back(nodes[idx++].nodes)
-                    # this.visit_statement(nodes[idx++].nodes)
-                    # Repeat
-                    while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                        # Visit endl token
-                        ++idx
-                    end
+        if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
+            # Brace body: { stmts... }
+            ++idx
+            while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "statement")
+                if stack.front.body_stmts == null
+                    stack.front.body_stmts = new array
+                end
+                stack.front.body_stmts.push_back(nodes[idx++].nodes)
+                while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
+                    ++idx
                 end
             end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "->")
-                matched = true
-                # Visit term "->"
-                ++idx
-                # Recursive Visit cond-expr
-                stack.front.body_expr = nodes[idx++].nodes
-                # this.visit_cond_expr(nodes[idx++].nodes)
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        else
+            # Expression body: -> cond-expr
+            ++idx
+            stack.front.body_expr = nodes[idx++].nodes
         end
     end
     function visit_prep_stmt(nodes)
@@ -1094,7 +985,7 @@ class generator
                         end
                     end
                     if require_ver <= ecs_info.std_version
-                        println("@require: 210508", nodes.front.pos)
+                        println("@require: " + ecs_info.min_runtime, nodes.front.pos)
                         return
                     else
                         error(nodes.front.pos, "Newer Language Standard required: " + require_ver + ", now on " + ecs_info.std_version)
@@ -1290,27 +1181,13 @@ class generator
         ++indent
         # Repeat
         while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-case" || typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-default")
-            # Condition
-            block
-                var matched = false
-                if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-case")
-                    matched = true
-                    # Recursive Visit switch-case
-                    this.visit_switch_case(nodes[idx++].nodes)
-                end
-                if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-default")
-                    matched = true
-                    # Recursive Visit switch-default
-                    this.visit_switch_default(nodes[idx++].nodes)
-                end
-                if !matched
-                	# Error
-                	return
-                end
+            if nodes[idx].root == "switch-case"
+                this.visit_switch_case(nodes[idx++].nodes)
+            else
+                this.visit_switch_default(nodes[idx++].nodes)
             end
-            # Repeat
+            # Repeat (skip endline tokens)
             while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                # Visit endl token
                 ++idx
             end
         end
@@ -1321,33 +1198,32 @@ class generator
             error(nodes.front.pos, "Expect expression or slicing in index operator.")
         end
         if nodes.size > 3
+            # Slice expression: [begin:end:step]
             var idx = 1
             slice_ext = true
             target.print(".ecs_slice_ext(")
             if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
-                this.visit_add_expr(nodes[idx].nodes)
-                ++idx
+                this.visit_add_expr(nodes[idx++].nodes)
             else
                 target.print("null")
             end
             target.print(", ")
             ++idx
             if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
-                this.visit_add_expr(nodes[idx].nodes)
-                ++idx
+                this.visit_add_expr(nodes[idx++].nodes)
             else
                 target.print("null")
             end
             target.print(", ")
             ++idx
             if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "add-expr"
-                this.visit_add_expr(nodes[idx].nodes)
-                ++idx
+                this.visit_add_expr(nodes[idx++].nodes)
             else
                 target.print("null")
             end
             target.print(")")
         else
+            # Simple index: [expr]
             if typeid nodes[1] == typeid parsergen.syntax_tree && nodes[1].root == "add-expr"
                 target.print("[")
                 this.visit_add_expr(nodes[1].nodes)
@@ -1929,24 +1805,10 @@ class generator
         this.visit_endline(nodes[idx++].nodes)
     end
     function visit_endline(nodes)
-        var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                matched = true
-                # Visit endl token
-                ++idx; println("", {0, nodes.front.pos[1] - 1})
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ";")
-                matched = true
-                # Visit term ";"
-                ++idx; println("", nodes.front.pos)
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[0] == typeid parsergen.token_type && nodes[0].type == "endl"
+            println("", {0, nodes[0].pos[1] - 1})
+        else
+            println("", nodes[0].pos)
         end
     end
     function visit_try_stmt(nodes)
@@ -2075,32 +1937,17 @@ class generator
     end
     function visit_function_body(nodes)
         var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{")
-                matched = true
-                # Visit term "{"
-                ++idx
-                # Recursive Visit stmts
-                this.visit_stmts(nodes[idx++].nodes)
-                # Visit term "}"
-                ++idx; println("end", {0, nodes.back.pos[1] - 1})
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                matched = true
-                # Visit endl token
-                ++idx
-                # Recursive Visit stmts
-                this.visit_stmts(nodes[idx++].nodes)
-                # Visit term "end"
-                print_indent()
-                println("end", {0, nodes.back.pos[1] - 1})
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
+            # Brace-delimited body: { stmts }
+            ++idx
+            this.visit_stmts(nodes[idx++].nodes)
+            println("end", {0, nodes.back.pos[1] - 1})
+        else
+            # Indentation-based body: stmts... end
+            ++idx
+            this.visit_stmts(nodes[idx++].nodes)
+            print_indent()
+            println("end", {0, nodes.back.pos[1] - 1})
         end
     end
     function visit_loop_stmt(nodes)
@@ -2112,47 +1959,17 @@ class generator
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
         print_indent()
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "until-stmt")
-                matched = true
-                # Recursive Visit until-stmt
-                this.visit_until_stmt(nodes[idx++].nodes)
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "end")
-                matched = true
-                # Visit term "end"
-                println("end", {0, nodes.back.pos[1] - 1})
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "until-stmt"
+            # Loop with until condition
+            this.visit_until_stmt(nodes[idx++].nodes)
+        else
+            # Infinite loop
+            println("end", {0, nodes.back.pos[1] - 1})
         end
     end
     function visit_control_stmt(nodes)
-        var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "break")
-                matched = true
-                # Visit term "break"
-                ++idx; target.print("break")
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "continue")
-                matched = true
-                # Visit term "continue"
-                ++idx; target.print("continue")
-            end
-            if !matched
-            	# Error
-            	return
-            end
-        end
-        # Recursive Visit endline
-        this.visit_endline(nodes[idx++].nodes)
+        target.print(nodes[0].data)
+        this.visit_endline(nodes[1].nodes)
     end
     function visit_logic_or_expr(nodes)
         var idx = 0
@@ -2305,27 +2122,14 @@ class generator
     end
     function visit_var_def(nodes)
         var idx = 0
-        # Condition
-        block
-            var matched = false
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-bind")
-                matched = true
-                # Recursive Visit var-bind
-                this.visit_var_bind(nodes[idx++].nodes)
-                # Visit term "="
-                ++idx; target.print(" = ")
-                # Recursive Visit basic-expr
-                this.visit_basic_expr(nodes[idx++].nodes)
-            end
-            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-list")
-                matched = true
-                # Recursive Visit var-list
-                this.visit_var_list(nodes[idx++].nodes)
-            end
-            if !matched
-            	# Error
-            	return
-            end
+        if typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-bind"
+            # Destructuring bind: (a, b, c) = expr
+            this.visit_var_bind(nodes[idx++].nodes)
+            ++idx; target.print(" = ")
+            this.visit_basic_expr(nodes[idx++].nodes)
+        else
+            # Simple variable list: var a = expr, b = expr
+            this.visit_var_list(nodes[idx++].nodes)
         end
     end
     function visit_expr_stmt(nodes)
@@ -2494,7 +2298,7 @@ class generator
             visit_begin(ast.nodes)
         catch e
             if e.what == "ECS_ERROR"
-                system.exit(0)
+                system.exit(1)
             end
         end
         var file_name = name + (is_package ? ".csp" : ".csc")

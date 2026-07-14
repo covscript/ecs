@@ -1,0 +1,83 @@
+# Unit tests: Type system (is, not, as, =>, type constructors)
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- is / not type checks ----
+var n = 42
+var f = 3.14
+var s = "hello"
+
+assert(n is integer, "42 is integer")
+assert(f not integer, "3.14 not integer")
+assert(f is float, "3.14 is float")
+assert(n not float, "42 not float")
+assert(s is string, "'hello' is string")
+assert(s not number, "'hello' not number")
+assert(n is number, "42 is number")
+
+# ---- null / true / false ----
+assert(null == null, "null == null")
+assert(true == true, "true == true")
+assert(false == false, "false == false")
+assert(true != false, "true != false")
+
+# ---- Type identity (class A ... end) ----
+class A
+end
+class B
+end
+class C extends A
+end
+
+var a = new A{}
+var b = new B{}
+var c = new C{}
+
+assert(a is A, "instance is A")
+assert(b is B, "instance is B")
+assert(c is C, "instance is C")
+assert(c is A, "subclass instance is parent")
+assert(a not B, "A instance not B")
+
+# ---- as / => type conversion ----
+assert_eq(3.14 as integer, 3, "float as integer")
+assert_eq("3.14" => number, 3.14, "string => number")
+assert_eq(3.14 as string, "3.14", "float as string")
+assert_eq('!' => integer, 33, "char => integer")
+
+# ---- new / gcnew internal type constructors ----
+assert_eq(new integer{6.28}, 6, "new integer")
+assert_eq(new string{6.28}, "6.28", "new string")
+
+# ---- hash_map / hash_set ----
+var hm = {"hello": "world"} as hash_map
+assert_eq(hm["hello"], "world", "hash_map as conversion")
+var hs = {"hello", "world"} => hash_set
+assert(hs.exist("hello"), "hash_set => conversion")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: type system  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

@@ -1,0 +1,168 @@
+# CI for ecs (Extended Covariant Script / CovScript 4)
+#
+# ecs is a CovScript-to-CovScript transpiler. This CI:
+#   1. Downloads a pre-built CovScript SDK from csbuild releases
+#   2. Configures cspkg to use the bundled package repository
+#   3. Installs remote dependencies (parsergen, regex, codec, sdk_extension)
+#   4. Builds and installs ecs/ecs_parser/ecs_generator/ecs_bootstrap from local source
+#   5. Runs non-interactive unit tests in unit_tests/
+
+name: CI
+
+on:
+  push:
+    branches: [master, main, improve/*]
+  pull_request:
+    branches: [master, main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: "${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2022]
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Check out this repo                                              #
+      # ------------------------------------------------------------------ #
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # ------------------------------------------------------------------ #
+      # 2. Set platform identifiers                                         #
+      # ------------------------------------------------------------------ #
+      - name: Set platform identifiers
+        id: platform
+        shell: bash
+        run: |
+          case "${{ runner.os }}" in
+            Linux)   echo "os=ubuntu" >> "$GITHUB_OUTPUT"
+                     echo "arch=x86_64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=amd64" >> "$GITHUB_OUTPUT" ;;
+            macOS)   echo "os=macos" >> "$GITHUB_OUTPUT"
+                     echo "arch=arm64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=arm64" >> "$GITHUB_OUTPUT" ;;
+            Windows) echo "os=windows" >> "$GITHUB_OUTPUT"
+                     echo "arch=x86_64" >> "$GITHUB_OUTPUT"
+                     echo "cspkg_arch=amd64" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      # ------------------------------------------------------------------ #
+      # 3. Download CovScript SDK + cspkg repository                        #
+      # ------------------------------------------------------------------ #
+      - name: Download CovScript SDK and cspkg repo
+        id: sdk
+        shell: bash
+        run: |
+          OS="${{ steps.platform.outputs.os }}"
+          ARCH="${{ steps.platform.outputs.arch }}"
+          BASE="https://github.com/covscript/csbuild/releases/download/${OS}-schedule"
+          COV="covscript-${OS}-${ARCH}-nightly.7z"
+          PKG="cspkg-${OS}-${ARCH}-nightly.7z"
+
+          echo "Downloading ${COV}..."
+          curl -fsSL -o covscript.7z "${BASE}/${COV}"
+          echo "Downloading ${PKG}..."
+          curl -fsSL -o cspkg.7z "${BASE}/${PKG}"
+
+          7z x covscript.7z -y
+          mv build covscript-home
+          7z x cspkg.7z -y
+
+          CS_HOME="${{ github.workspace }}/covscript-home"
+          CS_HOME="${CS_HOME//\\//}"
+          echo "cs_home=${CS_HOME}" >> "$GITHUB_OUTPUT"
+
+          echo "=== covscript-home/bin ==="
+          ls covscript-home/bin/
+
+      # ------------------------------------------------------------------ #
+      # 4. Configure cspkg                                                  #
+      # ------------------------------------------------------------------ #
+      - name: Configure cspkg
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.cspkg"
+
+          CS_HOME="${{ steps.sdk.outputs.cs_home }}"
+          WS="${{ github.workspace }}"
+          WS="${WS//\\//}"
+
+          if [[ "$WS" =~ ^[A-Za-z]:/ ]]; then
+            SOURCE_URL="file:///${WS}/cspkg-repo/"
+          else
+            SOURCE_URL="file://${WS}/cspkg-repo/"
+          fi
+
+          cat > "$HOME/.cspkg/config.json" << EOF
+          {
+            "arch": "${{ steps.platform.outputs.cspkg_arch }}",
+            "home": "${CS_HOME}",
+            "source": "${SOURCE_URL}",
+            "timeout_ms": 3000
+          }
+          EOF
+
+          echo "=== cspkg config ==="
+          cat "$HOME/.cspkg/config.json"
+
+      # ------------------------------------------------------------------ #
+      # 5. Setup environment                                                #
+      # ------------------------------------------------------------------ #
+      - name: Setup environment
+        shell: bash
+        run: |
+          CS_HOME="${{ steps.sdk.outputs.cs_home }}"
+          echo "COVSCRIPT_HOME=${CS_HOME}" >> "$GITHUB_ENV"
+          echo "${CS_HOME}/bin" >> "$GITHUB_PATH"
+
+      # ------------------------------------------------------------------ #
+      # 6. Install remote dependencies + build local packages                #
+      # ------------------------------------------------------------------ #
+      - name: Install dependencies and build local packages
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" != "Windows" ]; then
+            chmod -R +x "$COVSCRIPT_HOME/bin/"
+          fi
+          # Install remote dependencies
+          cspkg install parsergen sdk_extension codec regex --yes
+          # Build and install local packages from csbuild/
+          cspkg build --install ecs ecs_parser ecs_generator ecs_bootstrap
+          echo ""
+          echo "=== Installed packages ==="
+          cspkg list
+
+      # ------------------------------------------------------------------ #
+      # 7. Run unit tests                                                   #
+      # ------------------------------------------------------------------ #
+      - name: Run unit tests
+        shell: bash
+        run: |
+          set -e
+          echo "=== Unit Tests ==="
+          fail=0
+          for test in unit_tests/*.ecs; do
+            echo ""
+            echo "--- $test ---"
+            if ecs "$test"; then
+              echo "  -> PASS"
+            else
+              echo "  -> FAIL"
+              fail=1
+            fi
+          done
+          if [ $fail -ne 0 ]; then
+            echo ""
+            echo "=== SOME TESTS FAILED ==="
+            exit 1
+          fi
+          echo ""
+          echo "=== All unit tests passed ==="

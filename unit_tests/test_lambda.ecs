@@ -1,0 +1,63 @@
+# Unit tests: Lambda expressions (simple, captures, type annotations, arrow body)
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- simple lambda (arrow body) ----
+var add = [](a, b)->a + b
+assert_eq(add(3, 7), 10, "simple arrow lambda add")
+
+# ---- simple lambda (brace body) ----
+var mul = [](a, b){
+    return a * b
+}
+assert_eq(mul(6, 7), 42, "brace lambda multiply")
+
+# ---- lambda with capture (by reference) ----
+var counter = 0
+var inc = [counter](){
+    ++counter
+    return counter
+}
+assert_eq(inc(), 1, "capture lambda inc 1")
+assert_eq(inc(), 2, "capture lambda inc 2")
+assert_eq(counter, 2, "capture by ref modifies original")
+
+# ---- lambda with capture (by value) ----
+var val = 100
+var read_val = [=val]()->val
+assert_eq(read_val(), 100, "capture by value reads 100")
+
+# ---- lambda with type annotation ----
+var double = [](x : number)->x * 2
+assert_eq(double(21), 42, "lambda with type annotation")
+
+# ---- lambda with no args ----
+var say_hi = []()->"Hello"
+assert_eq(say_hi(), "Hello", "no-arg lambda")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: lambda  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

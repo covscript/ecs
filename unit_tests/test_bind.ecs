@@ -1,0 +1,66 @@
+# Unit tests: Destructuring bind expressions
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- simple bind ----
+var (a, b) = {1, 2}
+assert_eq(a, 1, "bind a = 1")
+assert_eq(b, 2, "bind b = 2")
+
+# ---- bind with ellipsis (discards exactly one position) ----
+var (x, ..., z) = {10, 20, 30}
+assert_eq(x, 10, "bind x = 10 (first)")
+assert_eq(z, 30, "bind z = 30 (last with ...)")
+
+# ---- bind reassign with ellipsis ----
+var c = null
+(a, b, ..., c) = {100, 200, 300, 400}
+assert_eq(a, 100, "bind reassign a = 100")
+assert_eq(b, 200, "bind reassign b = 200")
+assert_eq(c, 400, "bind reassign c = 400 (last with ...)")
+
+# ---- bind in variable declaration ----
+var (p, q) = {100, 200}
+assert_eq(p, 100, "var bind p = 100")
+assert_eq(q, 200, "var bind q = 200")
+
+# ---- bind with function result ----
+function make_pair()
+    return {50, 60}
+end
+var (u, v) = make_pair()
+assert_eq(u, 50, "bind from function return u = 50")
+assert_eq(v, 60, "bind from function return v = 60")
+
+# ---- bind with multiple ellipsis ----
+var (first, ..., mid, ..., last) = {"a", "b", "c", "d", "e"}
+assert_eq(first, "a", "multi-ellipsis bind first = a")
+assert_eq(mid, "c", "multi-ellipsis bind mid = c")
+assert_eq(last, "e", "multi-ellipsis bind last = e")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: bind  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

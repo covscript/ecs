@@ -1,0 +1,82 @@
+# Unit tests: Array and string slicing
+# Note: ECS slicing is end-INCLUSIVE (not exclusive like Python)
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+var arr = {1, 2, 3, 4, 5, 6, 7}
+
+# ---- basic slice (full copy) ----
+var full = arr[:]
+assert_eq(full, {1, 2, 3, 4, 5, 6, 7}, "arr[:] = full copy")
+
+# ---- implicit step ----
+var as = arr[::]
+assert_eq(as, {1, 2, 3, 4, 5, 6, 7}, "arr[::] = full copy")
+
+# ---- begin-only (from index 3 inclusive) ----
+assert_eq(arr[3:], {4, 5, 6, 7}, "arr[3:] from index 3")
+
+# ---- end-only (to index 3 INCLUSIVE in ECS) ----
+assert_eq(arr[:3], {1, 2, 3, 4}, "arr[:3] to index 3 (inclusive)")
+
+# ---- begin and end (both inclusive in ECS) ----
+assert_eq(arr[1:4], {2, 3, 4, 5}, "arr[1:4] = [2,3,4,5]")
+
+# ---- reverse slice (auto step = -1) ----
+assert_eq(arr[4:1:], {5, 4, 3, 2}, "arr[4:1:] reverse")
+
+# ---- forward step (end inclusive) ----
+assert_eq(arr[1:5:2], {2, 4, 6}, "arr[1:5:2] step 2")
+
+# ---- reverse step (end inclusive) ----
+assert_eq(arr[5:1:-2], {6, 4, 2}, "arr[5:1:-2] step -2")
+
+# ---- string slicing (end inclusive) ----
+var str = "hello world"
+assert_eq(str[:4], "hello", "string[:4] = hello")
+assert_eq(str[6:], "world", "string[6:] = world")
+assert_eq(str[4:1:], "olle", "string reverse slice")
+
+# ---- invalid step direction ----
+var exception_caught = false
+try
+    arr[1:5:-1]
+catch e : ecs.slice_step_error
+    exception_caught = true
+end
+assert(exception_caught, "positive range with negative step throws")
+
+exception_caught = false
+try
+    arr[5:1:1]
+catch e : ecs.slice_step_error
+    exception_caught = true
+end
+assert(exception_caught, "negative range with positive step throws")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: slicing  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

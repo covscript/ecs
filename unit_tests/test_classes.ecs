@@ -1,0 +1,109 @@
+# Unit tests: Classes, structs, constructors, extends, to_string
+import ecs
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+# ---- simple struct ----
+struct Point
+    var x = 0
+    var y = 0
+end
+var p = new Point{}
+assert_eq(p.x, 0, "Point.x default = 0")
+assert_eq(p.y, 0, "Point.y default = 0")
+p.x = 10
+p.y = 20
+assert_eq(p.x, 10, "Point.x after set = 10")
+assert_eq(p.y, 20, "Point.y after set = 20")
+
+# ---- struct with constructor ----
+struct Rect
+    var w = 0
+    var h = 0
+    function construct(w_, h_)
+        w = w_
+        h = h_
+    end
+end
+var r = new Rect{30, 40}
+assert_eq(r.w, 30, "Rect.w from constructor = 30")
+assert_eq(r.h, 40, "Rect.h from constructor = 40")
+
+# ---- class with method ----
+class Calculator
+    var base = 0
+    function construct(b)
+        base = b
+    end
+    function add(x)
+        return base + x
+    end
+end
+var calc = new Calculator{10}
+assert_eq(calc.add(5), 15, "Calculator.add(5) = 15")
+
+# ---- class extends ----
+class Animal
+    function sound()
+        return "generic"
+    end
+end
+class Dog extends Animal
+    function sound() override
+        return "bark"
+    end
+end
+class Cat extends Animal
+    function sound() override
+        return "meow"
+    end
+end
+var dog = new Dog{}
+var cat = new Cat{}
+assert_eq(dog.sound(), "bark", "Dog.sound() = bark")
+assert_eq(cat.sound(), "meow", "Cat.sound() = meow")
+
+# ---- class with to_string ----
+class TestSum
+    var sum = 0
+    function construct(...args)
+        foreach it in args do sum += it
+    end
+    function to_string()
+        return global.to_string(sum)
+    end
+end
+var ts = new TestSum{1, 2, 3, 4}
+assert_eq(ts.sum, 10, "TestSum varargs constructor sum = 10")
+assert_eq(to_string(ts), "10", "TestSum to_string = 10")
+
+# ---- gcnew ----
+var gcp = gcnew Point{}
+gcp->x = 5
+assert_eq(gcp->x, 5, "gcnew Point->x = 5")
+
+# ---- Results ----
+system.out.println("")
+system.out.println("Test: classes  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end
