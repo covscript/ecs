@@ -133,11 +133,11 @@ jobs:
             chmod -R +x "$COVSCRIPT_HOME/bin/"
           fi
           # Initialize cspkg
-          cspkg install --import
+          cspkg install --import --yes
           # Build and install local packages from csbuild/
-          cspkg build . --install
+          cspkg build . --install --yes
           # Fix dependencies
-          cspkg install --fix
+          cspkg install --fix --yes
           echo ""
           echo "=== Installed packages ==="
           cspkg list
