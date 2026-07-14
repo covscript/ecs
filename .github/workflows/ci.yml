@@ -132,10 +132,12 @@ jobs:
           if [ "${{ runner.os }}" != "Windows" ]; then
             chmod -R +x "$COVSCRIPT_HOME/bin/"
           fi
-          # Install remote dependencies
-          cspkg install parsergen sdk_extension codec regex --yes
+          # Initialize cspkg
+          cspkg install --import
           # Build and install local packages from csbuild/
-          cspkg build --install ecs ecs_parser ecs_generator ecs_bootstrap
+          cspkg build . --install
+          # Fix dependencies
+          cspkg install --fix
           echo ""
           echo "=== Installed packages ==="
           cspkg list
