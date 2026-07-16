@@ -148,8 +148,12 @@ class generator
     function gen_unique_discard_id()
         return "__ecs_discard_" + ecs_prefix + to_string(++ecs_discard) + "__"
     end
-    function enter_recurse(pos)
+    function enter_recurse(nodes)
         if ++recursion_depth > max_recursion_depth
+            var pos = {0, 0}
+            if !nodes.empty() && typeid nodes[0] == typeid parsergen.token_type
+                pos = nodes[0].pos
+            end
             error(pos, "Maximum AST recursion depth exceeded (" + to_string(max_recursion_depth) + ").")
         end
     end
@@ -237,7 +241,7 @@ class generator
                 if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "module-list")
                     matched = true
                     # Recursive Visit module-list
-                    this.enter_recurse(nodes.front.pos)
+                    this.enter_recurse(nodes)
                     this.visit_module_list(nodes[idx++].nodes)
                     this.leave_recurse()
                 end
@@ -257,7 +261,7 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -603,7 +607,7 @@ class generator
             # Visit term ","
             ++idx
             # Recursive Visit capture-list
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_capture_list(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -653,7 +657,7 @@ class generator
                 # Recursive Visit unary-op
                 this.visit_unary_op(nodes[idx++].nodes)
                 # Recursive Visit unary-expr
-                this.enter_recurse(nodes.front.pos)
+                this.enter_recurse(nodes)
                 this.visit_unary_expr(nodes[idx++].nodes)
                 this.leave_recurse()
             end
@@ -799,7 +803,7 @@ class generator
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "postfix-expr")
             # Recursive Visit postfix-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_postfix_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -917,7 +921,7 @@ class generator
                 end
             end
             # Recursive Visit relat-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_relat_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1082,7 +1086,7 @@ class generator
                         target.print(", ")
                     end
                     # Recursive Visit argument-list
-                    this.enter_recurse(nodes.front.pos)
+                    this.enter_recurse(nodes)
                     this.visit_argument_list(nodes[idx++].nodes, print)
                     this.leave_recurse()
                 end
@@ -1118,7 +1122,7 @@ class generator
                 end
             end
             # Recursive Visit visit-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_visit_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1146,7 +1150,7 @@ class generator
                     # Recursive Visit asi-op
                     this.visit_asi_op(nodes[idx++].nodes)
                     # Recursive Visit basic-expr
-                    this.enter_recurse(nodes.front.pos)
+                    this.enter_recurse(nodes)
                     this.visit_basic_expr(nodes[idx++].nodes)
                     this.leave_recurse()
                 end
@@ -1192,7 +1196,7 @@ class generator
                 end
             end
             # Recursive Visit mul-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_mul_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1324,7 +1328,7 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit var-list
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_var_list(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1521,7 +1525,7 @@ class generator
                 end
             end
             # Recursive Visit add-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_add_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1699,7 +1703,7 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit using-list
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_using_list(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -1847,7 +1851,7 @@ class generator
             # Visit term ","
             ++idx; println("", nodes[idx - 1].pos)
             # Recursive Visit import-list
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_import_list(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -2075,7 +2079,7 @@ class generator
                 end
             end
             # Recursive Visit logic-or-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_logic_or_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
@@ -2119,7 +2123,7 @@ class generator
                 target.print(ecs_prefix + "ecs.general_is(")
                 this.visit_relat_expr(nodes[0].nodes)
                 target.print(", ")
-                this.enter_recurse(nodes.front.pos)
+                this.enter_recurse(nodes)
                 this.visit_equal_expr(nodes[2].nodes)
                 this.leave_recurse()
                 target.print(")")
@@ -2148,7 +2152,7 @@ class generator
                     end
                 end
                 # Recursive Visit equal-expr
-                this.enter_recurse(nodes.front.pos)
+                this.enter_recurse(nodes)
                 this.visit_equal_expr(nodes[idx++].nodes)
                 this.leave_recurse()
             end
@@ -2261,7 +2265,7 @@ class generator
                 end
             end
             # Recursive Visit logic-and-expr
-            this.enter_recurse(nodes.front.pos)
+            this.enter_recurse(nodes)
             this.visit_logic_and_expr(nodes[idx++].nodes)
             this.leave_recurse()
         end
