@@ -1,8 +1,8 @@
-# Extended Covariant Script Header: v1.3.4
+# Extended Covariant Script Header: v1.4.0
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a clone of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Copyright (C) 2017-2026 Michael Lee(李登淳)
+# cloneright (C) 2017-2026 Michael Lee(李登淳)
 #
 # Email:   mikecovlee@163.com
 # Github:  https://github.com/mikecovlee
@@ -22,7 +22,11 @@ import sdk_extension as sdk
 
 package ecs
 
-# Types
+
+# ============================================================
+#  Type System
+# ============================================================
+
 
 namespace type_validator
     function __type(obj)
@@ -55,6 +59,7 @@ namespace type_validator
     end
 end
 
+
 @begin
 var special_type = {
     "type", "range", "istream", "ostream", "function", "exception", "namespace",
@@ -62,9 +67,16 @@ var special_type = {
 }.to_hash_set()
 @end
 
-# Exceptions
+@begin
+var internal_type = {
+    "number", "integer", "float", "char", "string",
+    "list", "hash_map", "hash_set"
+}.to_hash_set()
+@end
 
-var current_except = null
+# ============================================================
+#  Exception Classes
+# ============================================================
 
 class legacy_exception
     var error_text = new string
@@ -76,76 +88,14 @@ class legacy_exception
     end
 end
 
-function throw_exception(data)
-    current_except = data
-    throw runtime.exception("__ecs_except__")
-end
-
-function get_exception()
-    var except = null
-    swap(except, current_except)
-    return move(except)
-end
-
-# For Legacy CovScript Only
-
-function handle_exception(e)
-    if e.what == "__ecs_except__"
-        return get_exception()
-    else
-        return e
+class rethrow_error
+    var error_text = new string
+    function construct(msg)
+        error_text = to_string(msg)
     end
-end
-
-function param_new(type, args)
-    var data = new type
-    if !args.empty()
-        data.construct(args...)
+    function what()
+        return error_text
     end
-    return move(data)
-end
-
-function param_gcnew(type, args)
-    var data = gcnew type
-    if !args.empty()
-        data->construct(args...)
-    end
-    return move(data)
-end
-
-function check_type_s(name, id, func)
-    if !func(id)
-        throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
-    end
-end
-
-function check_type(name, id, type)
-    if typeid id != typeid type
-        throw throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
-    end
-end
-
-function general_is(lhs, rhs)
-    if type_validator.__type(rhs)
-        if typeid lhs != typeid rhs
-            return global.is_a(typeid lhs, typeid rhs)
-        else
-            return true
-        end
-    end
-    if type_validator.__type(lhs)
-        throw throw_exception(runtime.exception("Can not compare type with non-type objects."))
-    else
-        return lhs == rhs
-    end
-end
-
-function init_lambda(...args)
-    if args.empty()
-        throw throw_exception(runtime.exception("Invalid lambda initialization: no function provided."))
-    end
-    link func = args.pop_front()
-    return param_new(func, args).call
 end
 
 class slice_step_error
@@ -158,18 +108,170 @@ class slice_step_error
     end
 end
 
+class invalid_type
+    var error_text = new string
+    function construct(msg)
+        error_text = to_string(msg)
+    end
+    function what()
+        return error_text
+    end
+end
+
+namespace exceptions
+    link legacy_exception = global.legacy_exception
+    link slice_step_error = global.slice_step_error
+    link invalid_type = global.invalid_type
+    link rethrow_error = global.rethrow_error
+end
+
+# ============================================================
+#  Internal Helpers
+# ============================================================
+
+function param_new(type, args)
+    if type == null
+        throw_exception(invalid_type("param_new: type is null."))
+    end
+    if args == null || typeid args != typeid array
+        throw_exception(invalid_type("param_new: args must be a non-null array."))
+    end
+    var data = new type
+    if !args.empty()
+        data.construct(args...)
+    end
+    return move(data)
+end
+
+function param_gcnew(type, args)
+    if type == null
+        throw_exception(invalid_type("param_gcnew: type is null."))
+    end
+    if args == null || typeid args != typeid array
+        throw_exception(invalid_type("param_gcnew: args must be a non-null array."))
+    end
+    var data = gcnew type
+    if !args.empty()
+        data->construct(args...)
+    end
+    return move(data)
+end
+
+# ----------------------------------------------------------
+#  Exception State
+# ----------------------------------------------------------
+
+var current_except = null
+var last_except = null
+
+# ----------------------------------------------------------
+#  Exception Throw/Catch Machinery
+# ----------------------------------------------------------
+
+function throw_exception(data)
+    if data == null
+        data = param_new(invalid_type, {"Throw exception with null object."})
+    end
+    if type_validator.__exception(data)
+        current_except = param_new(legacy_exception, {data.what})
+    else
+        current_except = data
+    end
+    last_except = null
+    throw runtime.exception("__ecs_except__")
+end
+
+function rethrow_exception()
+    if last_except == null
+        throw_exception(param_new(rethrow_error, {"Rethrow without active exception."}))
+    else
+        swap(current_except, last_except)
+        last_except = null
+        throw runtime.exception("__ecs_except__")
+    end
+end
+
+function get_exception()
+    if current_except != null
+        swap(last_except, current_except)
+        current_except = null
+        return clone(last_except)
+    else
+        return null
+    end
+end
+
+# For Legacy CovScript Only
+function handle_exception(e)
+    if e != null && e.what == "__ecs_except__"
+        return get_exception()
+    else
+        return e
+    end
+end
+
+# ============================================================
+#  Generated Code Runtime Support
+# ============================================================
+
+# -- Type Checking --
+
+function check_type_s(name, id, func)
+    if !func(id)
+        throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
+    end
+end
+
+function check_type(name, id, type)
+    if typeid id != typeid type
+        throw_exception(runtime.exception("Wrong type for function argument \"" + name + "\"."))
+    end
+end
+
+# -- is-operator --
+
+function general_is(lhs, rhs)
+    if type_validator.__type(rhs)
+        if typeid lhs != typeid rhs
+            return global.is_a(typeid lhs, typeid rhs)
+        else
+            return true
+        end
+    end
+    if type_validator.__type(lhs)
+        throw_exception(runtime.exception("Can not compare type with non-type objects."))
+    else
+        return lhs == rhs
+    end
+end
+
+# -- Lambda --
+
+function init_lambda(...args)
+    if args.empty()
+        throw_exception(runtime.exception("Invalid lambda initialization: no function provided."))
+    end
+    link func = args.pop_front()
+    return param_new(func, args).call
+end
+
+# -- Slice Extension --
+
 function ecs_slice_array_ext(arr, beg, end, step)
     var arr_size = arr.size
+    if arr_size == 0
+        return new array
+    end
     var range_begin = 0, range_end = arr_size - 1, range_step = 1
     var slice_data = new array
     if beg != null
-        if beg < -arr_size
+        if beg < -arr_size || beg >= arr_size
             throw_exception(param_new(slice_step_error, {"Slice begin index out of range."}))
         end
         range_begin = beg
     end
     if end != null
-        if end < -arr_size
+        if end < -arr_size || end >= arr_size
             throw_exception(param_new(slice_step_error, {"Slice end index out of range."}))
         end
         range_end = end
@@ -203,16 +305,19 @@ end
 
 function ecs_slice_string_ext(str, beg, end, step)
     var str_size = str.size
+    if str_size == 0
+        return new string
+    end
     var range_begin = 0, range_end = str_size - 1, range_step = 1
     var slice_data = new string
     if beg != null
-        if beg < -str_size
+        if beg < -str_size || beg >= str_size
             throw_exception(param_new(slice_step_error, {"Slice begin index out of range."}))
         end
         range_begin = beg
     end
     if end != null
-        if end < -str_size
+        if end < -str_size || end >= str_size
             throw_exception(param_new(slice_step_error, {"Slice end index out of range."}))
         end
         range_end = end
@@ -244,15 +349,7 @@ function ecs_slice_string_ext(str, beg, end, step)
     return move(slice_data)
 end
 
-class invalid_type
-    var error_text = new string
-    function construct(msg)
-        error_text = to_string(msg)
-    end
-    function what()
-        return error_text
-    end
-end
+# -- Type Construction --
 
 namespace type_constructor
     function __number(val)
@@ -281,6 +378,9 @@ namespace type_constructor
         if typeid val != typeid number || val.is_float()
             throw_exception(param_new(invalid_type, {"Invalid type when construct char, require integer."}))
         end
+        if val < 0 || val > 127
+            throw_exception(param_new(invalid_type, {"Char value out of ASCII range (0-127)."}))
+        end
         return char.from_ascii(val)
     end
     function __string(val)
@@ -306,17 +406,8 @@ namespace type_constructor
     end
 end
 
-@begin
-var internal_type = {
-    "number", "integer", "float", "char", "string",
-    "list", "hash_map", "hash_set"
-}.to_hash_set()
-@end
-
-namespace exceptions
-    link legacy_exception = global.legacy_exception
-    link slice_step_error = global.slice_step_error
-    link invalid_type = global.invalid_type
-end
+# ============================================================
+#  Miscellaneous
+# ============================================================
 
 var discard = new array

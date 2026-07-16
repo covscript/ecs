@@ -148,16 +148,17 @@ jobs:
       - name: Run unit tests
         shell: bash
         run: |
-          set -e
           echo "=== Unit Tests ==="
           fail=0
           for test in unit_tests/*.ecs; do
             echo ""
             echo "--- $test ---"
-            if ecs "$test"; then
+            output=$(ecs "$test" 2>&1) || true
+            echo "$output"
+            if echo "$output" | grep -q "0 failed"; then
               echo "  -> PASS"
             else
-              echo "  -> FAIL"
+              echo "  -> FAIL (expected '0 failed' in output)"
               fail=1
             fi
           done
@@ -168,3 +169,12 @@ jobs:
           fi
           echo ""
           echo "=== All unit tests passed ==="
+
+      # ------------------------------------------------------------------ #
+      # 8. Code generation correctness tests                                #
+      # ------------------------------------------------------------------ #
+      - name: Codegen correctness tests
+        shell: bash
+        run: |
+          echo "=== Codegen Correctness Tests ==="
+          bash codegen_tests/run.sh

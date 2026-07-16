@@ -1,0 +1,4 @@
+import ecs
+function double(x : integer)
+    return x * 2
+end

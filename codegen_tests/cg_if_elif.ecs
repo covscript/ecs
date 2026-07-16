@@ -1,0 +1,10 @@
+import ecs
+var tag = ""
+var val = 42
+if val < 0
+    tag = "neg"
+else if val == 0
+    tag = "zero"
+else
+    tag = "pos"
+end

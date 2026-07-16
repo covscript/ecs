@@ -1,0 +1,6 @@
+import ecs
+struct Point
+    var x = 0
+    var y = 0
+end
+var p = {10, 20} as Point

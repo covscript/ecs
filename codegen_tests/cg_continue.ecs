@@ -1,0 +1,13 @@
+import ecs
+var sum = 0
+var i = 0
+while i < 10
+    ++i
+    if i % 2 == 0
+        continue
+    end
+    sum += i
+    if sum > 100
+        break
+    end
+end

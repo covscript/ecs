@@ -1,0 +1,3 @@
+import ecs
+var arr = {1, 2, 3}
+var x = arr[::]

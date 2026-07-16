@@ -1,0 +1,18 @@
+import ecs
+class ErrorA
+    function what()
+        return "A"
+    end
+end
+class ErrorB
+    function what()
+        return "B"
+    end
+end
+try
+    throw new ErrorB{}
+catch e : ErrorA
+    var x = 1
+catch e : ErrorB
+    var x = 2
+end

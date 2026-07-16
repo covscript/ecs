@@ -1,0 +1,8 @@
+import ecs
+class MyErr
+    function what()
+        return "err"
+    end
+end
+var e = new MyErr{}
+throw e

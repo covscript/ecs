@@ -1,0 +1,5 @@
+import ecs
+struct Point
+    var x = 0
+end
+var p = gcnew Point{1}
