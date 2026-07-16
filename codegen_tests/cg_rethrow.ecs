@@ -1,0 +1,6 @@
+import ecs
+try
+    var x = 1
+catch e
+    throw
+end

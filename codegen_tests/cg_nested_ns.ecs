@@ -1,0 +1,7 @@
+import ecs
+namespace outer
+    var a = 1
+    namespace inner
+        var b = 2
+    end
+end

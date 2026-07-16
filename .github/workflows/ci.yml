@@ -169,3 +169,12 @@ jobs:
           fi
           echo ""
           echo "=== All unit tests passed ==="
+
+      # ------------------------------------------------------------------ #
+      # 8. Code generation correctness tests                                #
+      # ------------------------------------------------------------------ #
+      - name: Codegen correctness tests
+        shell: bash
+        run: |
+          echo "=== Codegen Correctness Tests ==="
+          bash codegen_tests/run.sh

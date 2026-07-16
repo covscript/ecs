@@ -1,0 +1,2 @@
+import ecs
+var n = new integer{5}

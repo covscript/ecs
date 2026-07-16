@@ -1,0 +1,7 @@
+import ecs
+struct MyType
+    var val = 0
+end
+function process(x : MyType)
+    return x.val
+end

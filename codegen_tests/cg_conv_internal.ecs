@@ -1,0 +1,2 @@
+import ecs
+var x = 3.14 as integer

@@ -1,0 +1,4 @@
+import ecs
+function modify(=x)
+    x = 100
+end

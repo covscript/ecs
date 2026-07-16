@@ -1,0 +1,14 @@
+import ecs
+var tag = ""
+var val = 2
+switch val
+    case 1
+        tag = "one"
+    end
+    case 2
+        tag = "two"
+    end
+    default
+        tag = "other"
+    end
+end

@@ -1,0 +1,6 @@
+import ecs
+var x = 1
+block
+    var y = 2
+    x = y
+end

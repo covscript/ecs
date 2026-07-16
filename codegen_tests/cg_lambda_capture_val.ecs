@@ -1,0 +1,3 @@
+import ecs
+var counter = 0
+var f = [=counter]()->counter

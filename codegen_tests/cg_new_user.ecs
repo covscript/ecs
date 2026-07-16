@@ -1,0 +1,6 @@
+import ecs
+struct Point
+    var x = 0
+    var y = 0
+end
+var p = new Point{1, 2}
