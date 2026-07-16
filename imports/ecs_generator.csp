@@ -2375,6 +2375,7 @@ class generator
                 lambda_list = new array
                 stack = new array
                 indent = -1
+                recursion_depth = 0
                 return null
             end
         end
