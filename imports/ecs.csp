@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# You may obtain a clone of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Copyright (C) 2017-2026 Michael Lee(李登淳)
+# cloneright (C) 2017-2026 Michael Lee(李登淳)
 #
 # Email:   mikecovlee@163.com
 # Github:  https://github.com/mikecovlee
@@ -195,7 +195,7 @@ function get_exception()
     if current_except != null
         swap(last_except, current_except)
         current_except = null
-        return copy(last_except)
+        return clone(last_except)
     else
         return null
     end

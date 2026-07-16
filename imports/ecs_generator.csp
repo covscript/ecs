@@ -1266,16 +1266,18 @@ class generator
                 target.print("null")
             end
             target.print(")")
-        else if typeid nodes[1] == typeid parsergen.token_type && nodes[1].data == "::"
-            # [::] — explicit full-slice syntax (all elements)
-            slice_ext = true
-            target.print(".ecs_slice_ext(null, null, null)")
         else
-            # Simple index: [expr]
-            if typeid nodes[1] == typeid parsergen.syntax_tree && nodes[1].root == "add-expr"
-                target.print("[")
-                this.visit_add_expr(nodes[1].nodes)
-                target.print("]")
+            if typeid nodes[1] == typeid parsergen.token_type && nodes[1].data == "::"
+                # [::] -- explicit full-slice syntax (all elements)
+                slice_ext = true
+                target.print(".ecs_slice_ext(null, null, null)")
+            else
+                # Simple index: [expr]
+                if typeid nodes[1] == typeid parsergen.syntax_tree && nodes[1].root == "add-expr"
+                    target.print("[")
+                    this.visit_add_expr(nodes[1].nodes)
+                    target.print("]")
+                end
             end
         end
     end
