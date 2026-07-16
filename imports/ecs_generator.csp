@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 260714"
+    constant version = "4.0.0 Cuon alpinus(Unstable) Build 260716"
     constant std_version = "210607"
     constant min_runtime = "210508"
 end
@@ -86,6 +86,8 @@ class generator
     var slice_ext = false
     var minmal = false
     var indent = -1
+    var recursion_depth = 0
+    constant max_recursion_depth = 500
     # Debug Info
     var gen_dbg_info = false
     var dbg_line_map = new array
@@ -118,6 +120,9 @@ class generator
         end
     end
     function get_id_of_visit_expr(nodes)
+        if nodes.size == 0
+            return null
+        end
         var chain = {"object", "element"}
         foreach root in chain
             if nodes.size != 1 || typeid nodes[0] != typeid parsergen.syntax_tree || nodes[0].root != root
@@ -142,6 +147,14 @@ class generator
     end
     function gen_unique_discard_id()
         return "__ecs_discard_" + ecs_prefix + to_string(++ecs_discard) + "__"
+    end
+    function enter_recurse(pos)
+        if ++recursion_depth > max_recursion_depth
+            error(pos, "Maximum AST recursion depth exceeded (" + to_string(max_recursion_depth) + ").")
+        end
+    end
+    function leave_recurse()
+        --recursion_depth
     end
     function register_ecsx(path, hook)
         var ecsx = context.source_import(path)
@@ -197,7 +210,7 @@ class generator
                 this.visit_class_stmt(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -224,10 +237,12 @@ class generator
                 if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "module-list")
                     matched = true
                     # Recursive Visit module-list
+                    this.enter_recurse(nodes.front.pos)
                     this.visit_module_list(nodes[idx++].nodes)
+                    this.leave_recurse()
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -242,7 +257,9 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_block_stmt(nodes)
@@ -257,6 +274,8 @@ class generator
         print_indent()
         println("end", {0, nodes.back.pos[1] - 1})
     end
+    # If this error fires, a new AST node is routing here -- investigate.
+    # NOTE: visit_endblock is auto-generated template code and never called.
     function visit_endblock(nodes)
         var idx = 0
         # Condition
@@ -283,8 +302,7 @@ class generator
                 this.visit_catch_stmt(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
-            	return
+                error(nodes.front.pos, "Internal error: visit_endblock invoked with unknown node type '" + nodes.front.root + "'.")
             end
         end
     end
@@ -415,8 +433,7 @@ class generator
                 this.visit_expr_stmt(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
-            	return
+                error(nodes.front.pos, "Unknown statement type '" + nodes.front.root + "'.")
             end
         end
     end
@@ -441,7 +458,7 @@ class generator
                 this.visit_bind_expr(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -467,7 +484,7 @@ class generator
                 this.visit_var_bind(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -495,7 +512,7 @@ class generator
                 ++idx; target.print(", ")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -518,7 +535,7 @@ class generator
                 ++idx; target.print(", ")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -586,7 +603,9 @@ class generator
             # Visit term ","
             ++idx
             # Recursive Visit capture-list
+            this.enter_recurse(nodes.front.pos)
             this.visit_capture_list(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_catch_stmt(nodes)
@@ -610,9 +629,8 @@ class generator
         # Visit term "else"
         print_indent()
         ++idx; println("else", nodes.front.pos)
-        # Optional
+        # Optional elif branch
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "if")
-            stack.push_front("elif")
             ++indent
             print_indent()
             # Visit term "if"
@@ -621,7 +639,9 @@ class generator
             this.visit_basic_expr(nodes[idx++].nodes)
             # Visit endl token
             println("", {0, nodes.back.pos[1] - 1})
+            return true
         end
+        return false
     end
     function visit_unary_expr(nodes)
         var idx = 0
@@ -633,7 +653,9 @@ class generator
                 # Recursive Visit unary-op
                 this.visit_unary_op(nodes[idx++].nodes)
                 # Recursive Visit unary-expr
+                this.enter_recurse(nodes.front.pos)
                 this.visit_unary_expr(nodes[idx++].nodes)
+                this.leave_recurse()
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "new" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "gcnew")
                 matched = true
@@ -673,7 +695,7 @@ class generator
                 end
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -704,7 +726,7 @@ class generator
                 ++idx; target.print("false")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -770,14 +792,16 @@ class generator
                 ++idx; target.print("...")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "postfix-expr")
             # Recursive Visit postfix-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_postfix_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_lambda_expr(nodes)
@@ -804,9 +828,14 @@ class generator
         # Visit term ")"
         ++idx
         var arg_list = new array
-        while typeid stack.front != typeid string || stack.front != "function"
+        var arg_safety = 0
+        while (typeid stack.front != typeid string || stack.front != "function") && arg_safety < 256
             arg_list.push_front(stack.front.first : stack.front.second)
             stack.pop_front()
+            ++arg_safety
+        end
+        if arg_safety >= 256
+            error(nodes.front.pos, "Internal error: lambda argument collection exceeded safety limit (missing sentinel).")
         end
         stack.pop_front()
         stack.front.argument_list := arg_list
@@ -883,12 +912,14 @@ class generator
                     ++idx; target.print(" <= ")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit relat-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_relat_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_import_stmt(nodes)
@@ -946,7 +977,7 @@ class generator
                 ++idx; target.print(" ^= ")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -972,6 +1003,9 @@ class generator
         end
     end
     function visit_prep_stmt(nodes)
+        if nodes.size == 0
+            return
+        end
         # Visit prep token
         link prep = nodes.front.data
         if prep != "@begin" && prep != "@end"
@@ -1012,6 +1046,8 @@ class generator
                 # Visit id token
                 if print
                     target.print(nodes[idx++].data)
+                else
+                    ++idx
                 end
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "=" || typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id")
@@ -1046,11 +1082,13 @@ class generator
                         target.print(", ")
                     end
                     # Recursive Visit argument-list
+                    this.enter_recurse(nodes.front.pos)
                     this.visit_argument_list(nodes[idx++].nodes, print)
+                    this.leave_recurse()
                 end
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1075,12 +1113,14 @@ class generator
                     ++idx; target.print(".")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit visit-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_visit_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_basic_expr(nodes)
@@ -1106,11 +1146,13 @@ class generator
                     # Recursive Visit asi-op
                     this.visit_asi_op(nodes[idx++].nodes)
                     # Recursive Visit basic-expr
+                    this.enter_recurse(nodes.front.pos)
                     this.visit_basic_expr(nodes[idx++].nodes)
+                    this.leave_recurse()
                 end
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1145,16 +1187,18 @@ class generator
                     ++idx; target.print("^")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit mul-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_mul_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_conv_expr(nodes)
-        if nodes.size > 1
+        if nodes.size > 2
             # Recursive Visit visit-expr
             link visit_expr_nodes = nodes[2].nodes
             var id = get_id_of_visit_expr(visit_expr_nodes)
@@ -1180,7 +1224,7 @@ class generator
         var idx = 0
         ++indent
         # Repeat
-        while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-case" || typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-default")
+        while idx < nodes.size && ((typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-case") || (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-default"))
             if nodes[idx].root == "switch-case"
                 this.visit_switch_case(nodes[idx++].nodes)
             else
@@ -1194,7 +1238,7 @@ class generator
         --indent
     end
     function visit_index(nodes)
-        if nodes.size == 2
+        if nodes.size < 3
             error(nodes.front.pos, "Expect expression or slicing in index operator.")
         end
         if nodes.size > 3
@@ -1222,6 +1266,10 @@ class generator
                 target.print("null")
             end
             target.print(")")
+        else if typeid nodes[1] == typeid parsergen.token_type && nodes[1].data == "::"
+            # [::] — explicit full-slice syntax (all elements)
+            slice_ext = true
+            target.print(".ecs_slice_ext(null, null, null)")
         else
             # Simple index: [expr]
             if typeid nodes[1] == typeid parsergen.syntax_tree && nodes[1].root == "add-expr"
@@ -1265,7 +1313,7 @@ class generator
                 end
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1274,12 +1322,14 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit var-list
+            this.enter_recurse(nodes.front.pos)
             this.visit_var_list(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_if_stmt(nodes)
         var idx = 0
-        stack.push_front("if")
+        var elif_depth = 0
         # Visit term "if"
         ++idx; target.print("if ")
         # Recursive Visit basic-expr
@@ -1288,21 +1338,23 @@ class generator
         ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
-        # Repeat
+        # Repeat else / else-if clauses
         while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "else-stmt")
-            # Recursive Visit else-stmt
-            this.visit_else_stmt(nodes[idx++].nodes)
+            # Recursive Visit else-stmt (returns true if it is an elif)
+            if this.visit_else_stmt(nodes[idx++].nodes)
+                ++elif_depth
+            end
             # Recursive Visit stmts
             this.visit_stmts(nodes[idx++].nodes)
         end
-        while !stack.empty() && stack.front == "elif"
-            stack.pop_front()
+        # Close each elif block
+        while elif_depth > 0
             print_indent()
             println("end", {0, nodes.back.pos[1] - 1})
             --indent
+            --elif_depth
         end
-        stack.pop_front()
-        # Visit term "end"
+        # Visit term "end" (closes the outer if)
         print_indent()
         println("end", {0, nodes.back.pos[1] - 1})
     end
@@ -1358,7 +1410,7 @@ class generator
                 ++idx; target.print("constant ")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1428,7 +1480,7 @@ class generator
                 target.print(nodes[idx++].data)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1462,12 +1514,14 @@ class generator
                     ++idx; target.print(" - ")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit add-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_add_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_prim_expr(nodes)
@@ -1486,7 +1540,7 @@ class generator
                 this.visit_constant(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1552,13 +1606,13 @@ class generator
                 ++idx; target.print(")")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
         var expect_index = false
         # Repeat
-        while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "fcall" || typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "index")
+        while idx < nodes.size && ((typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "fcall") || (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "index"))
             # Condition
             block
                 var matched = false
@@ -1578,7 +1632,7 @@ class generator
                     this.visit_index(nodes[idx++].nodes)
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -1628,6 +1682,9 @@ class generator
         # Recursive Visit module-list
         stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
+        if stack.front.list.empty()
+            error(nodes.front.pos, "Expected module path in using statement.")
+        end
         stack.front.list.pop_front()
         if !stack.front.list.empty() && stack.front.list.back.data == "*"
             error(stack.front.list.back.pos, "Can not use wildcard symbol in using statement.")
@@ -1640,8 +1697,11 @@ class generator
             # Visit term ","
             ++idx; target.print(", ")
             # Recursive Visit using-list
+            this.enter_recurse(nodes.front.pos)
             this.visit_using_list(nodes[idx++].nodes)
+            this.leave_recurse()
         end
+        stack.pop_front()
     end
     function visit_cond_expr(nodes)
         var idx = 0
@@ -1664,7 +1724,7 @@ class generator
                 this.visit_lambda_expr(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1685,7 +1745,7 @@ class generator
                 this.visit_lambda_expr(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1714,7 +1774,7 @@ class generator
                 this.visit_value_expr(nodes[idx++].nodes)
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1785,13 +1845,15 @@ class generator
             # Visit term ","
             ++idx; println("", nodes[idx - 1].pos)
             # Recursive Visit import-list
+            this.enter_recurse(nodes.front.pos)
             this.visit_import_list(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_throw_stmt(nodes)
         var idx = 0
         # Visit term "throw"
-        ++idx; target.print("throw ")
+        ++idx
         # Optional
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "expr")
             target.print(ecs_prefix + "ecs.throw_exception(")
@@ -1799,12 +1861,15 @@ class generator
             this.visit_expr(nodes[idx++].nodes)
             target.print(")")
         else
-            target.print("runtime.exception(\"__ecs_except__\")")
+            target.print(ecs_prefix + "ecs.rethrow_exception()")
         end
         # Recursive Visit endline
         this.visit_endline(nodes[idx++].nodes)
     end
     function visit_endline(nodes)
+        if nodes.size == 0
+            return
+        end
         if typeid nodes[0] == typeid parsergen.token_type && nodes[0].type == "endl"
             println("", {0, nodes[0].pos[1] - 1})
         else
@@ -1819,15 +1884,18 @@ class generator
         ++idx; println("", nodes.front.pos)
         # Recursive Visit stmts
         this.visit_stmts(nodes[idx++].nodes)
-        stack.push_front("try")
-        # Repeat
+        # Collect catch clauses in source order using a local array (FIFO)
+        var catch_clauses = new array
         while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "catch-stmt")
             stack.push_front(new catch_type)
-            # Recursive Visit catch-stmt
+            # Recursive Visit catch-stmt (fills pos, id, type on stack.front)
             this.visit_catch_stmt(nodes[idx++].nodes)
             # Recursive Visit stmts
             stack.front.body = nodes[idx++].nodes
-            # this.visit_stmts(nodes[idx++].nodes)
+            catch_clauses.push_back(stack.pop_front())
+        end
+        if catch_clauses.empty()
+            error(nodes.front.pos, "Try statement must have at least one catch clause.")
         end
         print_indent()
         println("catch __ecs_except__", nodes.front.pos)
@@ -1843,8 +1911,8 @@ class generator
         --indent
         print_indent()
         println("end", nodes.front.pos)
-        while typeid stack.front != typeid string || stack.front != "try"
-            var dat = stack.pop_front()
+        # Process catch clauses in source order (typed catches first, generic deferred)
+        foreach dat in catch_clauses
             if dat.type == null
                 if default_catch != null
                     error(dat.pos, "Reduplicated generic catch statement.")
@@ -1911,7 +1979,8 @@ class generator
         end
         println("", nodes.front.pos)
         ++indent
-        while typeid stack.front != typeid string || stack.front != "function"
+        var fn_arg_safety = 0
+        while (typeid stack.front != typeid string || stack.front != "function") && fn_arg_safety < 256
             link map = stack.front.second
             if map.exist("pass-by-value")
                 print_indent()
@@ -1929,6 +1998,10 @@ class generator
                 end
             end
             stack.pop_front()
+            ++fn_arg_safety
+        end
+        if fn_arg_safety >= 256
+            error(nodes.front.pos, "Internal error: function argument collection exceeded safety limit (missing sentinel).")
         end
         stack.pop_front()
         --indent
@@ -1968,6 +2041,10 @@ class generator
         end
     end
     function visit_control_stmt(nodes)
+        if nodes.size < 2
+            error(nodes.front.pos, "Internal error: malformed control statement.")
+            return
+        end
         target.print(nodes[0].data)
         this.visit_endline(nodes[1].nodes)
     end
@@ -1991,12 +2068,14 @@ class generator
                     ++idx; target.print(" or ")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit logic-or-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_logic_or_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function visit_package_stmt(nodes)
@@ -2038,7 +2117,9 @@ class generator
                 target.print(ecs_prefix + "ecs.general_is(")
                 this.visit_relat_expr(nodes[0].nodes)
                 target.print(", ")
+                this.enter_recurse(nodes.front.pos)
                 this.visit_equal_expr(nodes[2].nodes)
+                this.leave_recurse()
                 target.print(")")
             end
         else
@@ -2060,12 +2141,14 @@ class generator
                         ++idx; target.print(" != ")
                     end
                     if !matched
-                	    # Error
+                	    error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	    return
                     end
                 end
                 # Recursive Visit equal-expr
+                this.enter_recurse(nodes.front.pos)
                 this.visit_equal_expr(nodes[idx++].nodes)
+                this.leave_recurse()
             end
         end
     end
@@ -2115,7 +2198,7 @@ class generator
                 ++idx; target.print("not ")
             end
             if !matched
-            	# Error
+            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -2171,12 +2254,14 @@ class generator
                     ++idx; target.print(" and ")
                 end
                 if !matched
-                	# Error
+                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
                 	return
                 end
             end
             # Recursive Visit logic-and-expr
+            this.enter_recurse(nodes.front.pos)
             this.visit_logic_and_expr(nodes[idx++].nodes)
+            this.leave_recurse()
         end
     end
     function gen_internal()
@@ -2272,6 +2357,9 @@ class generator
         @end
     end
     function repl_run(ast)
+        slice_ext = false
+        indent = -1
+        recursion_depth = 0
         var buff = new iostream.char_buff
         target = buff.get_ostream()
         try
@@ -2292,6 +2380,9 @@ class generator
         return to_string(header) + to_string(buff)
     end
     function run(name, ast)
+        slice_ext = false
+        indent = -1
+        recursion_depth = 0
         var buff = new iostream.char_buff
         target = buff.get_ostream()
         try
