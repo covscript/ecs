@@ -150,15 +150,18 @@ class generator
     end
     function enter_recurse(nodes)
         if ++recursion_depth > max_recursion_depth
-            var pos = {0, 0}
-            if !nodes.empty() && typeid nodes[0] == typeid parsergen.token_type
-                pos = nodes[0].pos
-            end
-            error(pos, "Maximum AST recursion depth exceeded (" + to_string(max_recursion_depth) + ").")
+            error(get_pos(nodes), "Maximum AST recursion depth exceeded (" + to_string(max_recursion_depth) + ").")
         end
     end
     function leave_recurse()
         --recursion_depth
+    end
+    function get_pos(nodes)
+        if !nodes.empty() && typeid nodes[0] == typeid parsergen.token_type
+            return nodes[0].pos
+        else
+            return {0, 0}
+        end
     end
     function register_ecsx(path, hook)
         var ecsx = context.source_import(path)
@@ -214,7 +217,7 @@ class generator
                 this.visit_class_stmt(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -246,7 +249,7 @@ class generator
                     this.leave_recurse()
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -306,7 +309,7 @@ class generator
                 this.visit_catch_stmt(nodes[idx++].nodes)
             end
             if !matched
-                error(nodes.front.pos, "Internal error: visit_endblock invoked with unknown node type '" + nodes.front.root + "'.")
+                error(get_pos(nodes), "Internal error: visit_endblock invoked with unknown node type '" + nodes.front.root + "'.")
             end
         end
     end
@@ -437,7 +440,7 @@ class generator
                 this.visit_expr_stmt(nodes[idx++].nodes)
             end
             if !matched
-                error(nodes.front.pos, "Unknown statement type '" + nodes.front.root + "'.")
+                error(get_pos(nodes), "Unknown statement type '" + nodes.front.root + "'.")
             end
         end
     end
@@ -462,7 +465,7 @@ class generator
                 this.visit_bind_expr(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -488,7 +491,7 @@ class generator
                 this.visit_var_bind(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -516,7 +519,7 @@ class generator
                 ++idx; target.print(", ")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -539,7 +542,7 @@ class generator
                 ++idx; target.print(", ")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -699,7 +702,7 @@ class generator
                 end
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -730,7 +733,7 @@ class generator
                 ++idx; target.print("false")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -796,7 +799,7 @@ class generator
                 ++idx; target.print("...")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -839,7 +842,7 @@ class generator
             ++arg_safety
         end
         if arg_safety >= 256
-            error(nodes.front.pos, "Internal error: lambda argument collection exceeded safety limit (missing sentinel).")
+            error(get_pos(nodes), "Internal error: lambda argument collection exceeded safety limit (missing sentinel).")
         end
         stack.pop_front()
         stack.front.argument_list := arg_list
@@ -916,7 +919,7 @@ class generator
                     ++idx; target.print(" <= ")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -981,7 +984,7 @@ class generator
                 ++idx; target.print(" ^= ")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1026,7 +1029,7 @@ class generator
                         println("@require: " + ecs_info.min_runtime, nodes.front.pos)
                         return
                     else
-                        error(nodes.front.pos, "Newer Language Standard required: " + require_ver + ", now on " + ecs_info.std_version)
+                        error(get_pos(nodes), "Newer Language Standard required: " + require_ver + ", now on " + ecs_info.std_version)
                     end
                 end
             end
@@ -1092,7 +1095,7 @@ class generator
                 end
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1117,7 +1120,7 @@ class generator
                     ++idx; target.print(".")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -1156,7 +1159,7 @@ class generator
                 end
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1191,7 +1194,7 @@ class generator
                     ++idx; target.print("^")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -1243,7 +1246,7 @@ class generator
     end
     function visit_index(nodes)
         if nodes.size < 3
-            error(nodes.front.pos, "Expect expression or slicing in index operator.")
+            error(get_pos(nodes), "Expect expression or slicing in index operator.")
         end
         if nodes.size > 3
             # Slice expression: [begin:end:step]
@@ -1319,7 +1322,7 @@ class generator
                 end
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1416,7 +1419,7 @@ class generator
                 ++idx; target.print("constant ")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1486,7 +1489,7 @@ class generator
                 target.print(nodes[idx++].data)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1520,7 +1523,7 @@ class generator
                     ++idx; target.print(" - ")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -1546,7 +1549,7 @@ class generator
                 this.visit_constant(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1612,7 +1615,7 @@ class generator
                 ++idx; target.print(")")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1638,7 +1641,7 @@ class generator
                     this.visit_index(nodes[idx++].nodes)
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -1689,7 +1692,7 @@ class generator
         stack.push_front(new module_type)
         this.visit_module_list(nodes[idx++].nodes)
         if stack.front.list.empty()
-            error(nodes.front.pos, "Expected module path in using statement.")
+            error(get_pos(nodes), "Expected module path in using statement.")
         end
         stack.front.list.pop_front()
         if !stack.front.list.empty() && stack.front.list.back.data == "*"
@@ -1730,7 +1733,7 @@ class generator
                 this.visit_lambda_expr(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1751,7 +1754,7 @@ class generator
                 this.visit_lambda_expr(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1780,7 +1783,7 @@ class generator
                 this.visit_value_expr(nodes[idx++].nodes)
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -1901,7 +1904,7 @@ class generator
             catch_clauses.push_back(stack.pop_front())
         end
         if catch_clauses.empty()
-            error(nodes.front.pos, "Try statement must have at least one catch clause.")
+            error(get_pos(nodes), "Try statement must have at least one catch clause.")
         end
         print_indent()
         println("catch __ecs_except__", nodes.front.pos)
@@ -2007,7 +2010,7 @@ class generator
             ++fn_arg_safety
         end
         if fn_arg_safety >= 256
-            error(nodes.front.pos, "Internal error: function argument collection exceeded safety limit (missing sentinel).")
+            error(get_pos(nodes), "Internal error: function argument collection exceeded safety limit (missing sentinel).")
         end
         stack.pop_front()
         --indent
@@ -2048,7 +2051,7 @@ class generator
     end
     function visit_control_stmt(nodes)
         if nodes.size < 2
-            error(nodes.front.pos, "Internal error: malformed control statement.")
+            error(get_pos(nodes), "Internal error: malformed control statement.")
             return
         end
         target.print(nodes[0].data)
@@ -2074,7 +2077,7 @@ class generator
                     ++idx; target.print(" or ")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
@@ -2147,7 +2150,7 @@ class generator
                         ++idx; target.print(" != ")
                     end
                     if !matched
-                	    error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	    error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	    return
                     end
                 end
@@ -2204,7 +2207,7 @@ class generator
                 ++idx; target.print("not ")
             end
             if !matched
-            	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+            	error(get_pos(nodes), "Internal error: unexpected AST node type.")
             	return
             end
         end
@@ -2260,7 +2263,7 @@ class generator
                     ++idx; target.print(" and ")
                 end
                 if !matched
-                	error(nodes.front.pos, "Internal error: unexpected AST node type.")
+                	error(get_pos(nodes), "Internal error: unexpected AST node type.")
                 	return
                 end
             end
