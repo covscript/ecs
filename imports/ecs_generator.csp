@@ -2015,13 +2015,11 @@ class generator
         var idx = 0
         ++idx  # skip "yield"
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "expr")
-            print_indent()
-            target.print("this.__channel.push_back(")
+            target.print("__ch.push_back(")
             this.visit_expr(nodes[idx++].nodes)
             println(")", nodes.front.pos)
         else
-            print_indent()
-            println("this.__channel.push_back(null)", nodes.front.pos)
+            println("__ch.push_back(null)", nodes.front.pos)
         end
         print_indent()
         target.print("fiber.yield()")
@@ -2122,9 +2120,8 @@ class generator
         ++indent
         # __fiber_body
         print_indent()
-        target.print("function __fiber_body(" + fiber_args + ") override")
+        target.print("function __fiber_body(__ch" + (fiber_args != "" ? ", " + fiber_args : "") + ") override")
         println("", pos)
-        ++indent
         var saved_async = async_depth
         ++async_depth
         # Visit function body
@@ -2138,7 +2135,6 @@ class generator
             this.visit_stmts(body_nodes[bi++].nodes)
         end
         async_depth = saved_async
-        --indent
         print_indent()
         println("end", pos)
         --indent
@@ -2496,8 +2492,9 @@ class generator
                 end
                 # __fiber_body
                 print_indent()
-                target.print("function __fiber_body(")
+                target.print("function __fiber_body(__ch")
                 if !dat.argument_list.empty()
+                    target.print(", ")
                     var fb_args = new string
                     foreach it in dat.argument_list
                         if it.second.exist("vargs")

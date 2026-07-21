@@ -410,16 +410,10 @@ end
 #  Async/Await Infrastructure
 # ============================================================
 
-struct ecs_async_base
+class awaitable
     var __fiber = null
     var __future = null
     var __channel = new array
-
-    function op_call(...args)
-        this.__fiber = fiber.create(this.__fiber_body, args...)
-        this.__future = this.__fiber.get_future()
-        return this
-    end
 
     function get()
         if this.__future == null
@@ -452,6 +446,15 @@ struct ecs_async_base
         var result = new array
         swap(result, this.__channel)
         return result
+    end
+end
+
+struct ecs_async_base
+    function op_call(...args)
+        var inst = new awaitable
+        inst.__fiber = fiber.create(this.__fiber_body, inst.__channel, args...)
+        inst.__future = inst.__fiber.get_future()
+        return move(inst)
     end
 
     function __fiber_body()
