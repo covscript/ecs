@@ -1,0 +1,149 @@
+# Codegen test: async/await - all syntax forms
+# Compile with: ecs codegen_tests/cg_async.ecs
+
+# === Async function: pure return ===
+async function pure_return()
+    return 42
+end
+
+# === Async function: return with expression ===
+async function compute(x, y)
+    return x * y + 1
+end
+
+# === Async function: yield + return ===
+async function generator(n)
+    foreach i in range(n)
+        yield i * 2
+    end
+    return n
+end
+
+# === Async function: yield without expression ===
+async function bare_yields()
+    yield
+    yield 1
+    yield
+    return "done"
+end
+
+# === Async function: no return (implicit) ===
+async function no_return()
+    var x = 1
+    var y = 2
+end
+
+# === Async function: throw ===
+async function will_throw(msg)
+    throw msg
+    return 0
+end
+
+# === Async function: variadic args ===
+async function variadic(prefix, ...items)
+    foreach it in items
+        yield prefix + it
+    end
+    return items.size
+end
+
+# === Async function: complex body with if/else ===
+async function conditional(x)
+    if x > 0
+        yield "positive"
+        return x
+    else
+        yield "non-positive"
+        return 0
+    end
+end
+
+# === Async function: nested loops ===
+async function nested(n, m)
+    foreach i in range(n)
+        foreach j in range(m)
+            yield {i, j}
+        end
+    end
+    return n * m
+end
+
+# === Async function: await inside (calls another async function) ===
+async function chained(x)
+    var v = await compute(x, 3)
+    return v * 2
+end
+
+# === Usage patterns (for codegen verification) ===
+
+# await func(args)
+var r1 = await compute(10, 2)
+
+# await func()
+var r2 = await pure_return()
+
+# func().get()
+var r3 = compute(1, 2).get()
+
+# func().consume_all()
+var all1 = generator(3).consume_all()
+
+# foreach over async function
+var sum = 0
+foreach val in generator(4)
+    sum += val
+end
+
+# await on stored instance
+var inst = compute(5, 5)
+var r4 = await inst
+
+# op_call on stored instance
+var inst2 = compute(1, 1)
+var r5 = inst2().get()
+
+# === Variadic call ===
+var v1 = variadic("item:", "a", "b", "c")
+var v_all = v1.consume_all()
+
+# === Async lambdas ===
+
+# Async lambda: expression body
+var al1 = async [](x) -> x * 2
+
+# Async lambda: statement body
+var al2 = async [](x) {
+    if x > 0
+        return x
+    else
+        return -x
+    end
+}
+
+# Async lambda: with captures
+var base = 10
+var al3 = async [base](n) -> base + n
+
+# Async lambda: with by-value capture
+var factor = 3
+var al4 = async [=factor](n) {
+    yield factor * n
+    return factor
+}
+
+# Async lambda: no args, no captures
+var al5 = async []() -> "hello"
+
+# === Exception handling ===
+var exc_ok = false
+try
+    var _ = await will_throw("test")
+catch e
+    exc_ok = e == "test"
+end
+
+# === Multiple independent instances ===
+var gen_a = generator(3)
+var gen_b = generator(5)
+var a_data = gen_a.consume_all()
+var b_data = gen_b.consume_all()

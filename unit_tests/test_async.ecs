@@ -1,0 +1,156 @@
+function assert(condition, msg)
+    if !condition
+        system.out.println("FAIL: " + msg)
+        system.exit(1)
+    end
+end
+
+var passed = 0
+var failed = 0
+
+system.out.println("Test: async/await")
+
+# Test 1: Basic async - await via .get()
+async function compute()
+    return 42
+end
+var result = await compute()
+if result == 42
+    system.out.println("  PASS: async function returns value via await")
+    ++passed
+else
+    system.out.println("  FAIL: async function returns value via await")
+    ++failed
+end
+
+# Test 2: Async with arg - await via .get()
+async function double_val(n)
+    return n * 2
+end
+var r2 = await double_val(21)
+if r2 == 42
+    system.out.println("  PASS: async function with argument")
+    ++passed
+else
+    system.out.println("  FAIL: async function with argument")
+    ++failed
+end
+
+# Test 3: Yield + foreach
+async function count(n)
+    foreach i in range(n)
+        yield i
+    end
+    return n
+end
+var sum = 0
+foreach val in count(5)
+    sum += val
+end
+if sum == 10
+    system.out.println("  PASS: yield + foreach")
+    ++passed
+else
+    system.out.println("  FAIL: yield + foreach")
+    ++failed
+end
+
+# Test 4: consume_all
+async function gen123()
+    yield 1
+    yield 2
+    yield 3
+    return "done"
+end
+var results = gen123().consume_all()
+if results == {1, 2, 3}
+    system.out.println("  PASS: consume_all")
+    ++passed
+else
+    system.out.println("  FAIL: consume_all")
+    ++failed
+end
+
+# Test 5: Exception via await
+async function throw_error()
+    throw "test_error"
+    return 0
+end
+var exc_caught = false
+try
+    var _ = await throw_error()
+catch e
+    exc_caught = true
+    if e == "test_error"
+        system.out.println("  PASS: exception propagates from async function")
+        ++passed
+    else
+        system.out.println("  FAIL: wrong exception message: " + to_string(e))
+        ++failed
+    end
+end
+if !exc_caught
+    system.out.println("  FAIL: exception was not caught from async function")
+    ++failed
+end
+
+# Test 6: Implicit completion
+async function implicit_done()
+    var x = 99
+end
+var imp_result = await implicit_done()
+if imp_result == null
+    system.out.println("  PASS: implicit completion returns null")
+    ++passed
+else
+    system.out.println("  FAIL: expected null, got " + to_string(imp_result))
+    ++failed
+end
+
+# Test 7: await on existing instance
+async function single_use()
+    return "once"
+end
+var su = single_use()
+var su1 = await su
+if su1 == "once"
+    system.out.println("  PASS: first await on instance works")
+    ++passed
+else
+    system.out.println("  FAIL: first await on instance")
+    ++failed
+end
+
+# Test 8: Direct .get() equivalent to await
+var r_direct = double_val(21).get()
+if r_direct == 42
+    system.out.println("  PASS: direct .get() same as await")
+    ++passed
+else
+    system.out.println("  FAIL: direct .get()")
+    ++failed
+end
+
+# Test 9: Exception in direct .get()
+var dth_caught = false
+try
+    var _ = throw_error().get()
+catch e
+    dth_caught = true
+    if e == "test_error"
+        system.out.println("  PASS: exception in .get() propagates")
+        ++passed
+    else
+        system.out.println("  FAIL: wrong exception: " + to_string(e))
+        ++failed
+    end
+end
+if !dth_caught
+    system.out.println("  FAIL: exception was not caught in .get()")
+    ++failed
+end
+
+system.out.println("Test: async/await - " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

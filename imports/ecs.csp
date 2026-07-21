@@ -252,7 +252,7 @@ function init_lambda(...args)
         throw_exception(runtime.exception("Invalid lambda initialization: no function provided."))
     end
     link func = args.pop_front()
-    return param_new(func, args).call
+    return move(param_new(func, args))
 end
 
 # -- Slice Extension --
@@ -403,6 +403,62 @@ namespace type_constructor
             throw_exception(param_new(invalid_type, {"Invalid type when construct hash set, require array."}))
         end
         return val.to_hash_set()
+    end
+end
+
+# ============================================================
+#  Async/Await Infrastructure
+# ============================================================
+
+class awaitable
+    var __fiber = null
+    var __future = null
+    var __channel = new array
+
+    function get()
+        if this.__future == null
+            return null
+        end
+        return this.__future.get()
+    end
+
+    function next()
+        if this.__fiber == null
+            return {null, true}
+        end
+        while this.__channel.empty() && !this.__fiber.is_finished()
+            this.__fiber.resume()
+        end
+        if !this.__channel.empty()
+            return {this.__channel.pop_front(), this.__channel.empty() && this.__fiber.is_finished()}
+        else
+            return {null, true}
+        end
+    end
+
+    function consume_all()
+        if this.__fiber == null
+            return new array
+        end
+        while !this.__fiber.is_finished()
+            this.__fiber.resume()
+        end
+        var result = new array
+        swap(result, this.__channel)
+        return result
+    end
+end
+
+struct ecs_async_base
+    function op_call(...args)
+        var inst = new awaitable
+        inst.__fiber = fiber.create(this.__fiber_body, inst.__channel, args...)
+        inst.__future = inst.__fiber.get_future()
+        return move(inst)
+    end
+
+    function __fiber_body()
+        # Override in derived struct.
     end
 end
 

@@ -85,8 +85,10 @@ var covscript_syntax = {
         {syntax.ref("loop-stmt")},
         {syntax.ref("for-stmt")},
         {syntax.ref("foreach-stmt")},
+        {syntax.ref("async-function-stmt")},
         {syntax.ref("control-stmt")},
         {syntax.ref("function-stmt")},
+        {syntax.ref("yield-stmt")},
         {syntax.ref("return-stmt")},
         {syntax.ref("try-stmt")},
         {syntax.ref("throw-stmt")},
@@ -98,6 +100,7 @@ var covscript_syntax = {
         {syntax.ref("namespace-stmt")},
         {syntax.ref("var-stmt")},
         {syntax.ref("using-stmt")},
+        {syntax.ref("async-function-stmt")},
         {syntax.ref("function-stmt")},
         {syntax.ref("class-stmt")}
     )},
@@ -209,6 +212,14 @@ var covscript_syntax = {
         syntax.cond_or({syntax.term("class")}, {syntax.term("struct")}), syntax.token("id"), syntax.optional(syntax.term("extends"), syntax.ref("visit-expr")), syntax.token("endl"),
         syntax.ref("decl-stmts"), syntax.term("end"), syntax.token("endl")
     },
+    "async-function-stmt" : {
+        syntax.term("async"), syntax.term("function"), syntax.token("id"),
+        syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"),
+        syntax.optional(syntax.term("override")), syntax.ref("function-body")
+    },
+    "yield-stmt" : {
+        syntax.term("yield"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("expr")), syntax.ref("endline")
+    },
     "control-stmt" : {
         syntax.cond_or({syntax.term("break")}, {syntax.term("continue")}), syntax.ref("endline")
     },
@@ -244,6 +255,11 @@ var covscript_syntax = {
         {syntax.term("%=")},
         {syntax.term("^=")}
     )},
+    "async-lambda-expr" : {
+        syntax.term("async"), syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"),
+        syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"),
+        syntax.ref("lambda-body")
+    },
     "lambda-expr" : {
         syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"), syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"), syntax.ref("lambda-body")
     },
@@ -259,16 +275,18 @@ var covscript_syntax = {
         {syntax.term("->"), syntax.ref("cond-expr")}
     )},
     "cond-expr" : {syntax.cond_or(
-        {syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))},
-        {syntax.ref("lambda-expr")}
+        {syntax.ref("async-lambda-expr")},
+        {syntax.ref("lambda-expr")},
+        {syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))}
     )},
     "cond-postfix" : {syntax.cond_or(
         {syntax.term("?"), syntax.ref("value-expr"), syntax.term(":"), syntax.ref("cond-expr")},
         {syntax.term(":"), syntax.ref("value-expr")}
     )},
     "value-expr" : {syntax.cond_or(
-        {syntax.ref("logic-or-expr")},
-        {syntax.ref("lambda-expr")}
+        {syntax.ref("async-lambda-expr")},
+        {syntax.ref("lambda-expr")},
+        {syntax.ref("logic-or-expr")}
     )},
     "logic-or-expr" : {
         syntax.ref("logic-and-expr"), syntax.optional(syntax.cond_or({syntax.term("||")}, {syntax.term("or")}), syntax.ref("logic-or-expr"))
@@ -309,7 +327,11 @@ var covscript_syntax = {
     "postfix-expr" : {
         syntax.cond_or({syntax.term("++")}, {syntax.term("--")}, {syntax.term("...")}), syntax.optional(syntax.ref("postfix-expr"))
     },
+    "await-expr" : {
+        syntax.term("await"), syntax.ref("unary-expr")
+    },
     "prim-expr" : {syntax.cond_or(
+        {syntax.ref("await-expr")},
         {syntax.ref("visit-expr")},
         {syntax.ref("constant")}
     )},
