@@ -40,9 +40,9 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.0.0 Cuon alpinus(Unstable) Build 260716"
-    constant std_version = "210607"
-    constant min_runtime = "210508"
+    constant version = "4.1.0 Cuon alpinus(Stable) Build 1"
+    constant std_version = "260702"
+    constant min_runtime = "260702"
 end
 
 import parsergen, ecs
