@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.1.0 Cuon alpinus(Stable) Build 1"
+    constant version = "4.1.0 Cuon alpinus(Stable) Build 2"
     constant std_version = "260702"
     constant min_runtime = "260702"
 end
@@ -82,7 +82,7 @@ class generator
     var target = system.out
     var is_package = false
     var ecs_discard = 0
-    var ecs_prefix = "__impl_"
+    var ecs_prefix = "impl_"
     var stack = new array
     var slice_ext = false
     var minmal = false
@@ -905,7 +905,7 @@ class generator
             end
         end
         lambda_list.push_back(current_lambda)
-        target.print(ecs_prefix + "ecs.init_lambda(global." + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size)
+        target.print(ecs_prefix + "ecs.init_lambda(global.__" + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size + "__")
         var capture_str = ", "
         foreach it in current_lambda.capture_list
             capture_str += it.first + ", "
@@ -2067,7 +2067,7 @@ class generator
         link current_lambda = stack.front
         stack.pop_front()
         lambda_list.push_back(current_lambda)
-        target.print(ecs_prefix + "ecs.init_lambda(global." + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size)
+        target.print(ecs_prefix + "ecs.init_lambda(global.__" + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size + "__")
         var capture_str = ", "
         foreach it in current_lambda.capture_list
             capture_str += it.first + ", "
@@ -2112,7 +2112,7 @@ class generator
         if fiber_args != ""
             fiber_args.cut(2)
         end
-        var struct_name = ecs_prefix + "ecs_async_" + func_name
+        var struct_name = "__" + ecs_prefix + "ecs_async_" + func_name + "__"
         var pos = nodes.front.pos
         # Struct
         print_indent()
@@ -2461,7 +2461,7 @@ class generator
             link dat = lambda_list[i]
             if dat.is_async
                 # Async lambda: struct with captures + __fiber_body
-                println("struct " + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + " extends " + ecs_prefix + "ecs.ecs_async_base", dat.pos)
+                println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + "__ extends " + ecs_prefix + "ecs.ecs_async_base", dat.pos)
                 foreach it in dat.capture_list
                     print_indent()
                     println("var " + it.first + " = null", dat.pos)
@@ -2529,7 +2529,7 @@ class generator
                 print_indent()
                 println("end", dat.pos)
             else
-                println("struct " + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1), dat.pos)
+                println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + "__", dat.pos)
                 foreach it in dat.capture_list
                     print_indent()
                     println("var " + it.first + " = null", dat.pos)
@@ -2613,9 +2613,9 @@ class generator
     end
     function repl_header()
         @begin
-        return "import ecs as " + ecs_prefix + "ecs\nimport sdk_extension as ecs_sdk\n" +
-            "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_array_ext)\n" +
-            "ecs_sdk.extend_type(string, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_string_ext)"
+        return "import ecs as " + ecs_prefix + "ecs\nimport sdk_extension as " + ecs_prefix + "ecs_sdk\n" +
+            ecs_prefix + "ecs_sdk.extend_type(array, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_array_ext)\n" +
+            ecs_prefix + "ecs_sdk.extend_type(string, \"ecs_slice_ext\", " + ecs_prefix + "ecs.ecs_slice_string_ext)"
         @end
     end
     function repl_run(ast)

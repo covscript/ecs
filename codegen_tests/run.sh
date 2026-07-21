@@ -120,8 +120,8 @@ run_test "[::] full-slice on array" \
 # ---- catch clause FIFO ordering ----
 run_test "catch typed-before-generic order" \
   "$SCRIPT_DIR/cg_catch_order.ecs" \
-  --expect 'typeid __impl_ecs\.current_except == typeid(ErrorA)' \
-  --expect 'typeid __impl_ecs\.current_except == typeid(ErrorB)'
+  --expect 'typeid impl_ecs\.current_except == typeid(ErrorA)' \
+  --expect 'typeid impl_ecs\.current_except == typeid(ErrorB)'
 
 # ---- lambda capture: value vs reference ----
 run_test "lambda capture-by-value (=x)" \
@@ -224,8 +224,8 @@ run_test "switch statement generation" \
 # ---- async/await ----
 run_test "async/await code generation" \
   "$SCRIPT_DIR/cg_async.ecs" \
-  --expect 'struct __impl_ecs_async_compute extends __impl_ecs\.ecs_async_base' \
-  --expect 'struct __impl_ecs_lambda_impl_1 extends __impl_ecs\.ecs_async_base' \
+  --expect 'struct __impl_ecs_async_compute__ extends impl_ecs\.ecs_async_base' \
+  --expect 'struct __impl_ecs_lambda_impl_1__ extends impl_ecs\.ecs_async_base' \
   --expect 'function __fiber_body(__ch' \
   --expect '__ch\.push_back(' \
   --expect '\.get()'
