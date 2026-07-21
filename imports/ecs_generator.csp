@@ -61,6 +61,7 @@ struct lambda_type
     var body_stmts = null
     var body_expr = null
     var pos = {0, 0}
+    var is_async = false
 end
 
 struct catch_type
@@ -88,6 +89,9 @@ class generator
     var indent = -1
     var recursion_depth = 0
     constant max_recursion_depth = 500
+    # Async/Await state
+    var async_depth = 0
+    var in_struct_depth = 0
     # Debug Info
     var gen_dbg_info = false
     var dbg_line_map = new array
@@ -205,6 +209,14 @@ class generator
                 matched = true
                 # Recursive Visit using-stmt
                 this.visit_using_stmt(nodes[idx++].nodes)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "async-function-stmt")
+                matched = true
+                if in_struct_depth > 0
+                    error(get_pos(nodes[idx].nodes), "'async function' is not allowed inside a struct or class body.")
+                    return
+                end
+                this.visit_async_function_stmt(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "function-stmt")
                 matched = true
@@ -409,10 +421,18 @@ class generator
                 # Recursive Visit control-stmt
                 this.visit_control_stmt(nodes[idx++].nodes)
             end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "async-function-stmt")
+                matched = true
+                this.visit_async_function_stmt(nodes[idx++].nodes)
+            end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "function-stmt")
                 matched = true
                 # Recursive Visit function-stmt
                 this.visit_function_stmt(nodes[idx++].nodes)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "yield-stmt")
+                matched = true
+                this.visit_yield_stmt(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "return-stmt")
                 matched = true
@@ -588,7 +608,9 @@ class generator
         # Visit endl token
         ++idx; println("", nodes.front.pos)
         # Recursive Visit decl-stmts
+        ++in_struct_depth
         this.visit_decl_stmts(nodes[idx++].nodes)
+        --in_struct_depth
         # Visit term "end"
         print_indent()
         println("end", {0, nodes.back.pos[1] - 1})
@@ -813,6 +835,8 @@ class generator
     end
     function visit_lambda_expr(nodes)
         var idx = 0
+        var saved_async = async_depth
+        async_depth = 0
         stack.push_front(new lambda_type)
         stack.front.pos = nodes.front.pos
         # Visit term "["
@@ -881,13 +905,14 @@ class generator
             end
         end
         lambda_list.push_back(current_lambda)
-        target.print(ecs_prefix + "ecs.init_lambda(global.__" + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size + "__")
+        target.print(ecs_prefix + "ecs.init_lambda(global." + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size)
         var capture_str = ", "
         foreach it in current_lambda.capture_list
             capture_str += it.first + ", "
         end
         capture_str.cut(2)
         target.print(capture_str + ")")
+        async_depth = saved_async
     end
     function visit_relat_expr(nodes)
         var idx = 0
@@ -1538,6 +1563,10 @@ class generator
         # Condition
         block
             var matched = false
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "await-expr")
+                matched = true
+                this.visit_await_expr(nodes[idx++].nodes)
+            end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "visit-expr")
                 matched = true
                 # Recursive Visit visit-expr
@@ -1556,15 +1585,12 @@ class generator
     end
     function visit_return_stmt(nodes)
         var idx = 0
-        # Visit term "return"
-        ++idx; target.print("return")
-        # Optional
+        ++idx  # skip "return"
+        target.print("return")
         if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "expr")
             target.print(" ")
-            # Recursive Visit expr
             this.visit_expr(nodes[idx++].nodes)
         end
-        # Recursive Visit endline
         this.visit_endline(nodes[idx++].nodes)
     end
     function visit_while_stmt(nodes)
@@ -1727,6 +1753,10 @@ class generator
                     this.visit_cond_postfix(nodes[idx++].nodes)
                 end
             end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "async-lambda-expr")
+                matched = true
+                this.visit_async_lambda_expr(nodes[idx++].nodes)
+            end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-expr")
                 matched = true
                 # Recursive Visit lambda-expr
@@ -1747,6 +1777,10 @@ class generator
                 matched = true
                 # Recursive Visit logic-or-expr
                 this.visit_logic_or_expr(nodes[idx++].nodes)
+            end
+            if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "async-lambda-expr")
+                matched = true
+                this.visit_async_lambda_expr(nodes[idx++].nodes)
             end
             if !matched && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-expr")
                 matched = true
@@ -1965,6 +1999,172 @@ class generator
         print_indent()
         println("end", {0, nodes.back.pos[1] - 1})
     end
+    # === Async/Await Support ===
+    function visit_await_expr(nodes)
+        var idx = 0
+        ++idx  # skip "await"
+        target.print("(")
+        this.visit_unary_expr(nodes[idx++].nodes)
+        target.print(").get()")
+    end
+    function visit_yield_stmt(nodes)
+        if async_depth <= 0
+            error(get_pos(nodes), "'yield' can only be used inside an async function.")
+            return
+        end
+        var idx = 0
+        ++idx  # skip "yield"
+        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "expr")
+            print_indent()
+            target.print("this.__channel.push_back(")
+            this.visit_expr(nodes[idx++].nodes)
+            println(")", nodes.front.pos)
+        else
+            print_indent()
+            println("this.__channel.push_back(null)", nodes.front.pos)
+        end
+        print_indent()
+        target.print("fiber.yield()")
+        this.visit_endline(nodes[idx++].nodes)
+    end
+    function visit_async_lambda_expr(nodes)
+        var idx = 0
+        ++idx  # skip "async"
+        stack.push_front(new lambda_type)
+        stack.front.is_async = true
+        stack.front.pos = nodes.front.pos
+        # Visit term "["
+        ++idx
+        # Optional
+        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "capture-list")
+            # Recursive Visit capture-list
+            this.visit_capture_list(nodes[idx++].nodes)
+        end
+        # Visit term "]"
+        ++idx
+        stack.push_front("function")
+        # Visit term "("
+        ++idx
+        # Optional
+        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "argument-list")
+            # Recursive Visit argument-list
+            this.visit_argument_list(nodes[idx++].nodes, false)
+        end
+        # Visit term ")"
+        ++idx
+        var arg_list = new array
+        var arg_safety = 0
+        while (typeid stack.front != typeid string || stack.front != "function") && arg_safety < 256
+            arg_list.push_front(stack.front.first : stack.front.second)
+            stack.pop_front()
+            ++arg_safety
+        end
+        if arg_safety >= 256
+            error(get_pos(nodes), "Internal error: lambda argument collection exceeded safety limit (missing sentinel).")
+        end
+        stack.pop_front()
+        stack.front.argument_list := arg_list
+        # Recursive Visit lambda-body
+        this.visit_lambda_body(nodes[idx++].nodes)
+        link current_lambda = stack.front
+        stack.pop_front()
+        lambda_list.push_back(current_lambda)
+        target.print(ecs_prefix + "ecs.init_lambda(global." + ecs_prefix + "ecs_lambda_impl_" + lambda_list.size)
+        var capture_str = ", "
+        foreach it in current_lambda.capture_list
+            capture_str += it.first + ", "
+        end
+        capture_str.cut(2)
+        target.print(capture_str + ")")
+    end
+    function visit_async_function_stmt(nodes)
+        var idx = 0
+        ++idx  # skip "async"
+        ++idx  # skip "function"
+        var func_name = nodes[idx++].data
+        ++idx  # skip "("
+        stack.push_front("function")
+        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "argument-list")
+            this.visit_argument_list(nodes[idx++].nodes, false)
+        end
+        ++idx  # skip ")"
+        if idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "override")
+            error(get_pos(nodes), "'async function' does not support 'override'.")
+            return
+        end
+        var arg_list = new array
+        var arg_safety = 0
+        while (typeid stack.front != typeid string || stack.front != "function") && arg_safety < 256
+            arg_list.push_front(stack.front.first : stack.front.second)
+            stack.pop_front()
+            ++arg_safety
+        end
+        if arg_safety >= 256
+            error(get_pos(nodes), "Internal error: async function argument collection exceeded safety limit (missing sentinel).")
+        end
+        stack.pop_front()
+        var fiber_args = ""
+        foreach it in arg_list
+            if it.second.exist("vargs")
+                fiber_args += "..." + it.first + ", "
+            else
+                fiber_args += it.first + ", "
+            end
+        end
+        if fiber_args != ""
+            fiber_args.cut(2)
+        end
+        var struct_name = ecs_prefix + "ecs_async_" + func_name
+        var pos = nodes.front.pos
+        # Struct
+        print_indent()
+        println("struct " + struct_name + " extends " + ecs_prefix + "ecs.ecs_async_base", pos)
+        ++indent
+        # __fiber_body
+        print_indent()
+        target.print("function __fiber_body(" + fiber_args + ") override")
+        println("", pos)
+        ++indent
+        var saved_async = async_depth
+        ++async_depth
+        # Visit function body
+        var body_nodes = nodes[idx++].nodes
+        var bi = 0
+        if typeid body_nodes[bi] == typeid parsergen.token_type && body_nodes[bi].data == "{"
+            ++bi  # skip "{"
+            this.visit_stmts(body_nodes[bi++].nodes)
+        else
+            ++bi  # skip endl
+            this.visit_stmts(body_nodes[bi++].nodes)
+        end
+        async_depth = saved_async
+        --indent
+        print_indent()
+        println("end", pos)
+        --indent
+        print_indent()
+        println("end", pos)
+        # Factory function — creates new instance per call
+        print_indent()
+        target.print("function " + func_name + "(" + fiber_args + ")")
+        println("", pos)
+        ++indent
+        print_indent()
+        println("var __inst = new " + struct_name, pos)
+        if fiber_args != ""
+            print_indent()
+            target.print("__inst(" + fiber_args + ")")
+            println("", pos)
+        else
+            print_indent()
+            println("__inst()", pos)
+        end
+        print_indent()
+        println("return __inst", pos)
+        --indent
+        print_indent()
+        println("end", pos)
+    end
     function visit_function_stmt(nodes)
         var idx = 0
         stack.push_front("function")
@@ -2014,8 +2214,11 @@ class generator
         end
         stack.pop_front()
         --indent
-        # Recursive Visit function-body
+        # Recursive Visit function-body (non-async context)
+        var saved_async = async_depth
+        async_depth = 0
         this.visit_function_body(nodes[idx++].nodes)
+        async_depth = saved_async
     end
     function visit_function_body(nodes)
         var idx = 0
@@ -2277,85 +2480,155 @@ class generator
         for i = 0, i < lambda_list.size, ++i
             indent = 1
             link dat = lambda_list[i]
-            println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + "__", dat.pos)
-            foreach it in dat.capture_list
-                print_indent()
-                println("var " + it.first + " = null", dat.pos)
-            end
-            print_indent()
-            target.print("function construct(")
-            if !dat.capture_list.empty()
-                var str = new string
+            if dat.is_async
+                # Async lambda: struct with captures + __fiber_body
+                println("struct " + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + " extends " + ecs_prefix + "ecs.ecs_async_base", dat.pos)
                 foreach it in dat.capture_list
-                    str += "_" + it.first + ", "
+                    print_indent()
+                    println("var " + it.first + " = null", dat.pos)
                 end
-                str.cut(2)
-                target.print(str)
-            end
-            println(")", dat.pos)
-            ++indent
-            foreach it in dat.capture_list
+                # construct() for captures
+                if !dat.capture_list.empty()
+                    print_indent()
+                    target.print("function construct(")
+                    var cap_str = new string
+                    foreach it in dat.capture_list
+                        cap_str += "_" + it.first + ", "
+                    end
+                    cap_str.cut(2)
+                    target.print(cap_str)
+                    println(")", dat.pos)
+                    ++indent
+                    foreach it in dat.capture_list
+                        print_indent()
+                        if it.second
+                            println("this." + it.first + " = _" + it.first, dat.pos)
+                        else
+                            println("this." + it.first + " := _" + it.first, dat.pos)
+                        end
+                    end
+                    --indent
+                    print_indent()
+                    println("end", dat.pos)
+                end
+                # __fiber_body
                 print_indent()
-                if it.second
-                    println("this." + it.first + " = _" + it.first, dat.pos)
-                else
-                    println("this." + it.first + " := _" + it.first, dat.pos)
+                target.print("function __fiber_body(")
+                if !dat.argument_list.empty()
+                    var fb_args = new string
+                    foreach it in dat.argument_list
+                        if it.second.exist("vargs")
+                            fb_args += "..." + it.first + ", "
+                        else
+                            fb_args += it.first + ", "
+                        end
+                    end
+                    fb_args.cut(2)
+                    target.print(fb_args)
                 end
-            end
-            --indent
-            print_indent()
-            println("end", dat.pos)
-            print_indent()
-            target.print("function call(")
-            if !dat.argument_list.empty()
-                var str = new string
+                println(") override", dat.pos)
+                ++indent
+                var saved_async = async_depth
+                ++async_depth
+                if dat.body_stmts != null
+                    foreach it in dat.body_stmts
+                        this.visit_statement(it)
+                    end
+                end
+                if dat.body_expr != null
+                    print_indent()
+                    target.print("return ")
+                    this.visit_cond_expr(dat.body_expr)
+                    println("", dat.pos)
+                end
+                async_depth = saved_async
+                --indent
+                print_indent()
+                println("end", dat.pos)
+                --indent
+                print_indent()
+                println("end", dat.pos)
+            else
+                println("struct " + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1), dat.pos)
+                foreach it in dat.capture_list
+                    print_indent()
+                    println("var " + it.first + " = null", dat.pos)
+                end
+                print_indent()
+                target.print("function construct(")
+                if !dat.capture_list.empty()
+                    var str = new string
+                    foreach it in dat.capture_list
+                        str += "_" + it.first + ", "
+                    end
+                    str.cut(2)
+                    target.print(str)
+                end
+                println(")", dat.pos)
+                ++indent
+                foreach it in dat.capture_list
+                    print_indent()
+                    if it.second
+                        println("this." + it.first + " = _" + it.first, dat.pos)
+                    else
+                        println("this." + it.first + " := _" + it.first, dat.pos)
+                    end
+                end
+                --indent
+                print_indent()
+                println("end", dat.pos)
+                print_indent()
+                target.print("function op_call(")
+                if !dat.argument_list.empty()
+                    var str = new string
+                    foreach it in dat.argument_list
+                        if it.second.exist("vargs")
+                            str += "..." + it.first + ", "
+                        else
+                            str += it.first + ", "
+                        end
+                    end
+                    str.cut(2)
+                    target.print(str)
+                end
+                println(")", dat.pos)
+                ++indent
+                print_indent()
+                println("link self = this.op_call", dat.pos)
                 foreach it in dat.argument_list
-                    if it.second.exist("vargs")
-                        str += "..." + it.first + ", "
-                    else
-                        str += it.first + ", "
+                    link map = it.second
+                    if map.exist("pass-by-value")
+                        print_indent()
+                        println("context.unlink_var(\"" + it.first + "\")", dat.pos)
+                    end
+                    if map.exist("check-type")
+                        print_indent()
+                        var type_id = get_id_of_visit_expr(map["check-type"])
+                        if type_id != null && ecs.special_type.exist(type_id)
+                            println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", dat.pos)
+                        else
+                            target.print(ecs_prefix + "ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
+                            this.visit_visit_expr(map["check-type"])
+                            println(")", dat.pos)
+                        end
                     end
                 end
-                str.cut(2)
-                target.print(str)
-            end
-            println(")", dat.pos)
-            ++indent
-            print_indent()
-            println("link self = this.call", dat.pos)
-            foreach it in dat.argument_list
-                link map = it.second
-                if map.exist("pass-by-value")
-                    print_indent()
-                    println("context.unlink_var(\"" + it.first + "\")", dat.pos)
-                end
-                if map.exist("check-type")
-                    print_indent()
-                    var type_id = get_id_of_visit_expr(map["check-type"])
-                    if type_id != null && ecs.special_type.exist(type_id)
-                        println(ecs_prefix + "ecs.check_type_s(\"" + it.first + "\", " + it.first + ", " + ecs_prefix + "ecs.type_validator.__" + type_id + ")", dat.pos)
-                    else
-                        target.print(ecs_prefix + "ecs.check_type(\"" + it.first + "\", " + it.first + ", ")
-                        this.visit_visit_expr(map["check-type"])
-                        println(")", dat.pos)
+                if dat.body_stmts != null
+                    foreach it in dat.body_stmts
+                        this.visit_statement(it)
                     end
                 end
-            end
-            if dat.body_stmts != null
-                foreach it in dat.body_stmts
-                    this.visit_statement(it)
+                if dat.body_expr != null
+                    print_indent()
+                    target.print("return ")
+                    this.visit_cond_expr(dat.body_expr)
+                    println("", dat.pos)
                 end
-            end
-            if dat.body_expr != null
+                --indent
                 print_indent()
-                target.print("return ")
-                this.visit_cond_expr(dat.body_expr)
-                println("", dat.pos)
+                println("end", dat.pos)
+                println("end", dat.pos)
             end
-            --indent
-            print_indent()
-            println("end", dat.pos)
-            println("end", dat.pos)
         end
     end
     function repl_header()
@@ -2369,6 +2642,9 @@ class generator
         slice_ext = false
         indent = -1
         recursion_depth = 0
+        async_depth = 0
+        in_struct_depth = 0
+
         var buff = new iostream.char_buff
         target = buff.get_ostream()
         try
@@ -2379,6 +2655,8 @@ class generator
                 stack = new array
                 indent = -1
                 recursion_depth = 0
+                async_depth = 0
+                in_struct_depth = 0
                 return null
             end
         end
@@ -2393,6 +2671,9 @@ class generator
         slice_ext = false
         indent = -1
         recursion_depth = 0
+        async_depth = 0
+        in_struct_depth = 0
+
         var buff = new iostream.char_buff
         target = buff.get_ostream()
         try
