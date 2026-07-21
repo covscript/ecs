@@ -221,6 +221,15 @@ run_test "switch statement generation" \
   --expect 'case ' \
   --expect 'default'
 
+# ---- async/await ----
+run_test "async/await code generation" \
+  "$SCRIPT_DIR/cg_async.ecs" \
+  --expect 'struct __impl_ecs_async_compute extends __impl_ecs\.ecs_async_base' \
+  --expect 'struct __impl_ecs_lambda_impl_1 extends __impl_ecs\.ecs_async_base' \
+  --expect 'function __fiber_body(__ch' \
+  --expect '__ch\.push_back(' \
+  --expect '\.get()'
+
 # ================================================================
 # Summary
 # ================================================================
