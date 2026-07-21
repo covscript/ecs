@@ -252,7 +252,7 @@ function init_lambda(...args)
         throw_exception(runtime.exception("Invalid lambda initialization: no function provided."))
     end
     link func = args.pop_front()
-    return param_new(func, args)
+    return move(param_new(func, args))
 end
 
 # -- Slice Extension --

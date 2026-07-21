@@ -2144,26 +2144,9 @@ class generator
         --indent
         print_indent()
         println("end", pos)
-        # Factory function — creates new instance per call
+        # Instance — callable via op_call
         print_indent()
-        target.print("function " + func_name + "(" + fiber_args + ")")
-        println("", pos)
-        ++indent
-        print_indent()
-        println("var __inst = new " + struct_name, pos)
-        if fiber_args != ""
-            print_indent()
-            target.print("__inst(" + fiber_args + ")")
-            println("", pos)
-        else
-            print_indent()
-            println("__inst()", pos)
-        end
-        print_indent()
-        println("return __inst", pos)
-        --indent
-        print_indent()
-        println("end", pos)
+        println("var " + func_name + " = new " + struct_name, pos)
     end
     function visit_function_stmt(nodes)
         var idx = 0
