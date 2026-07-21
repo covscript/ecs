@@ -24,6 +24,7 @@ import parsergen, ecs_parser, ecs_generator, codec, regex
 import sdk_extension as sdk
 
 var wrapper_ver = "1.6.0"
+var exit_code = -1  # -1: continue, 0: success, >0: error
 
 function show_version_simple()
 @begin
@@ -66,7 +67,8 @@ class repl_instance
         until line != null
         code_buff.push_back(line)
         if line == "@exit"
-            system.exit(0)
+            exit_code = 0
+            return new array
         end
         line += "\n"
         var lexer = null
@@ -114,7 +116,8 @@ class repl_instance
                                 end
                             end
                             if repl_impl.has_exited()
-                                system.exit(0)
+                                exit_code = 0
+                                return
                             end
                         catch e
                             system.out.println(e.what)
@@ -139,7 +142,7 @@ function show_version()
         "  STD Version: " + ecs_generator.ecs_info.std_version + "\n"
     )
 @end
-    system.exit(0)
+    exit_code = 0
 end
 
 function show_help()
@@ -168,7 +171,7 @@ function show_help()
         "   -i <PATH>     Append import path\n"
     )
 @end
-    system.exit(0)
+    exit_code = 0
 end
 
 var compiler_args = new string
@@ -193,7 +196,8 @@ function process_args(cmd_args)
         switch cmd_args[index]
             default
                 system.out.println("Error: Unknown option \"" + cmd_args[index] + "\"")
-                system.exit(1)
+                exit_code = 1
+                return
             end
             case "-v"
                 show_version()
@@ -236,7 +240,8 @@ function process_args(cmd_args)
             case "-u"
                 if index == cmd_args.size - 1
                     system.out.println("Error: Option \"-u\" not completed. Usage: \"ecs -u <CHARSET>\"")
-                    system.exit(1)
+                    exit_code = 1
+                    return
                 end
                 unicode = cmd_args[++index].toupper()
                 if unicode == "AUTO"
@@ -246,14 +251,16 @@ function process_args(cmd_args)
             case "-i"
                 if index == cmd_args.size - 1
                     system.out.println("Error: Option \"-i\" not completed. Usage: \"ecs -i <PATH>\"")
-                    system.exit(1)
+                    exit_code = 1
+                    return
                 end
                 csx_path = cmd_args[++index]
             end
             case "-o"
                 if index == cmd_args.size - 1
                     system.out.println("Error: Option \"-o\" not completed. Usage: \"ecs -o <PATH>\"")
-                    system.exit(1)
+                    exit_code = 1
+                    return
                 end
                 output = cmd_args[++index]
                 no_run = true
@@ -261,7 +268,8 @@ function process_args(cmd_args)
             case "--"
                 if index == cmd_args.size - 1
                     system.out.println("Error: Option \"--\" not completed. Usage: \"ecs -- <ARGS>\"")
-                    system.exit(1)
+                    exit_code = 1
+                    return
                 end
                 compiler_args = cmd_args[++index]
             end
@@ -337,7 +345,8 @@ function setup_unicode(charset)
     if unicode_ext == null
         system.out.println("Error: unicode extension not installed yet.")
         system.out.println("Run 'cspkg install extension --yes' to enable unicode support.")
-        system.exit(2)
+        exit_code = 2
+        return null
     end
     var cvt_name = charset.toupper()
     if cvt_name == "AUTO"
@@ -345,7 +354,8 @@ function setup_unicode(charset)
     end
     if !codecvt_map.exist(cvt_name)
         system.out.println("Error: unknown unicode charset \"" + cvt_name + "\".")
-        system.exit(1)
+        exit_code = 1
+        return null
     end
     var cvt = codecvt_map.at(cvt_name)(unicode_ext)
     ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(cvt.local2wide(str)))
@@ -357,24 +367,48 @@ function setup_unicode(charset)
     return cvt
 end
 
-function main(cmd_args)
+function run_ecs(cmd_args)
+    # Reset all state for reentrancy
+    compiler_args = ""
+    file_name = ""
+    arguments = ""
+    args_arr = new array
+    executor = "cs "
+    no_hash = false
+    csx_path = null
+    unicode = null
+    minmal = false
+    no_run = false
+    silent = false
+    splash = null
+    output = null
+    csym = false
+    repl = false
+    exit_code = -1
+
     process_args(cmd_args)
+    if exit_code != -1
+        return exit_code
+    end
     if repl
         var instance = new repl_instance
         instance.silent = silent
         if unicode != null
             instance.unicode_cvt = setup_unicode(unicode)
+            if exit_code != -1
+                return exit_code
+            end
         end
         if csx_path != null
             sdk.set_import_path(runtime.get_import_path() + system.path.delimiter + csx_path)
             instance.codegen.ecsx_path = csx_path.split({system.path.delimiter})
         end
         instance.run(args_arr...)
-        system.exit(0)
+        return exit_code != -1 ? exit_code : 0
     end
     if !system.file.exist(file_name) || !match(ext_reg, file_name)
         system.out.println("Error: invalid input file.")
-        system.exit(1)
+        return 1
     end
     var file_hash = null
     if !no_hash
@@ -388,7 +422,7 @@ function main(cmd_args)
                     if name != null && !name.empty()
                         var mtime = ifs.getline().to_number()
                         if mtime == system.file.mtime(file_name)
-                            system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments)))
+                            return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments))
                         end
                     end
                 catch e
@@ -400,6 +434,9 @@ function main(cmd_args)
     var parser = new parsergen.generator
     if unicode != null
         parser.unicode_cvt = setup_unicode(unicode)
+        if exit_code != -1
+            return exit_code
+        end
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
@@ -408,7 +445,7 @@ function main(cmd_args)
             if csx_path != null
                 compiler_args += " -i " + csx_path
             end
-            system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + file_name + arguments)))
+            return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + file_name + arguments))
         end
         var codegen = new ecs_generator.generator
         if csx_path != null
@@ -441,7 +478,7 @@ function main(cmd_args)
                 if splash != null
                     system.out.println(splash)
                 end
-                system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments)))
+                return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
             end
         else
             system.path.mkdir_p("./.ecs_output/")
@@ -464,7 +501,12 @@ function main(cmd_args)
             if splash != null
                 system.out.println(splash)
             end
-            system.exit(no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments)))
+            return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
         end
     end
+    return 0
+end
+
+function main(cmd_args)
+    system.exit(run_ecs(cmd_args))
 end
