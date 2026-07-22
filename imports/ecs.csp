@@ -28,9 +28,10 @@ package ecs
 # ============================================================
 
 struct lambda_base
-    function construct()
-        # Override in derived struct.
-    end
+    # This is an empty base struct used to identify lambda objects
+    # in the CovScript type system. It serves as a marker for lambda
+    # functions and allows for type checking and validation of lambda
+    # objects within the ECS framework.
 end
 
 namespace type_validator
