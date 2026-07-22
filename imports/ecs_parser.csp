@@ -24,9 +24,9 @@ import parsergen, regex
 
 constant syntax = parsergen.syntax
 
-function get_lexical(reg_builder)
+function get_lexical(reg_builder, strict)
     @begin
-    return {
+    var lex = {
         "endl" : reg_builder("^\\n+$"),
         "id" :   reg_builder("^[A-Za-z_\\p{Han}](\\w|\\p{Han})*$"),
         "num" :  reg_builder("^[0-9]+\\.?([0-9]+)?$"),
@@ -37,382 +37,54 @@ function get_lexical(reg_builder)
         "lsig" : reg_builder("^(>|<|&|(\\|)|&&|(\\|\\|)|!|=(=|>)?|!=?|>=?|<=?)$"),
         "brac" : reg_builder("^(\\(|\\)|\\[|\\]|\\{|\\}|,)$"),
         "prep" : reg_builder("^@.*$"),
-        "ign" :  reg_builder("^([ \\f\\r\\t]+|#.*)$"),
         "err" :  reg_builder("^(\"|\'|(\\|)|\\.\\.)$")
     }.to_hash_map()
     @end
-end
-
-function get_fmt_lexical(reg_builder)
-    var lex = get_lexical(reg_builder)
-    lex["ign"] = reg_builder("^[ \\f\\r\\t]+$")
-    lex["com"] = reg_builder("^#.*$")
+    if strict
+        lex["com"] = reg_builder("^#.*$")
+        lex["ign"] = reg_builder("^[ \\f\\r\\t]+$")
+    else
+        lex["ign"] = reg_builder("^([ \\f\\r\\t]+|#.*)$")
+    end
     return lex
 end
 
-@begin
-var covscript_syntax = {
-    # Beginning of Parsing
-    "begin" : {
-        syntax.ref("stmts")
-    },
-    # Ignore if not match initiatively
-    "ignore" : {
-        syntax.repeat(syntax.token("endl"))
-    },
-    # End of Line
-    "endline" : {syntax.cond_or(
-        {syntax.token("endl")},
-        {syntax.term(";")}
-    )},
-    # Bootstrap
-    "stmts" : {
-        syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax.token("endl")))
-    },
-    "decl-stmts" : {
-        syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("declaration"), syntax.repeat(syntax.token("endl")))
-    },
-    "endblock" : {syntax.cond_or(
-        {syntax.ref("end-stmt")},
-        {syntax.ref("else-stmt")},
-        {syntax.ref("until-stmt")},
-        {syntax.ref("catch-stmt")}
-    )},
-    "statement" : {syntax.cond_or(
-        {syntax.ref("prep-stmt")},
-        {syntax.ref("package-stmt")},
-        {syntax.ref("import-stmt")},
-        {syntax.ref("var-stmt")},
-        {syntax.ref("block-stmt")},
-        {syntax.ref("namespace-stmt")},
-        {syntax.ref("using-stmt")},
-        {syntax.ref("if-stmt")},
-        {syntax.ref("switch-stmt")},
-        {syntax.ref("while-stmt")},
-        {syntax.ref("loop-stmt")},
-        {syntax.ref("for-stmt")},
-        {syntax.ref("foreach-stmt")},
-        {syntax.ref("async-function-stmt")},
-        {syntax.ref("control-stmt")},
-        {syntax.ref("function-stmt")},
-        {syntax.ref("yield-stmt")},
-        {syntax.ref("return-stmt")},
-        {syntax.ref("try-stmt")},
-        {syntax.ref("throw-stmt")},
-        {syntax.ref("class-stmt")},
-        {syntax.ref("expr-stmt")}
-    )},
-    "declaration" : {syntax.cond_or(
-        {syntax.ref("prep-stmt")},
-        {syntax.ref("namespace-stmt")},
-        {syntax.ref("var-stmt")},
-        {syntax.ref("using-stmt")},
-        {syntax.ref("async-function-stmt")},
-        {syntax.ref("function-stmt")},
-        {syntax.ref("class-stmt")}
-    )},
-    # Statements
-    "prep-stmt" : {
-        syntax.token("prep"), syntax.token("endl")
-    },
-    "package-stmt" : {
-        syntax.term("package"), syntax.token("id"), syntax.ref("endline")
-    },
-    "import-stmt" : {
-        syntax.term("import"), syntax.ref("import-list"), syntax.ref("endline")
-    },
-    "module-list" : {
-        syntax.token("id"), syntax.optional(syntax.term("."), syntax.cond_or({syntax.term("*")}, {syntax.ref("module-list")}))
-    },
-    "import-list" : {
-        syntax.ref("module-list"), syntax.optional(syntax.term("as"), syntax.token("id")), syntax.optional(syntax.term(","), syntax.ref("import-list"))
-    },
-    "var-def" : {
-        syntax.cond_or({syntax.ref("var-bind"), syntax.term("="), syntax.ref("basic-expr")}, {syntax.ref("var-list")})
-    },
-    "var-stmt" : {
-        syntax.cond_or({syntax.term("var")}, {syntax.term("link")}, {syntax.term("constant")}), syntax.ref("var-def"), syntax.ref("endline")
-    },
-    "var-bind" : {
-        syntax.term("("), syntax.ref("var-bind-list"), syntax.repeat(syntax.term(","), syntax.ref("var-bind-list")), syntax.term(")")
-    },
-    "var-bind-list" : {syntax.cond_or(
-        {syntax.token("id")},
-        {syntax.term("...")},
-        {syntax.ref("var-bind")}
-    )},
-    "var-list" : {
-        syntax.token("id"), syntax.cond_or(
-            {syntax.term("="), syntax.ref("basic-expr")},
-            {syntax.term("as"), syntax.ref("unary-expr"), syntax.optional(syntax.ref("array"))}
-        ), syntax.optional(syntax.term(","), syntax.ref("var-list"))
-    },
-    "block-stmt" : {
-        syntax.term("block"), syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "namespace-stmt" : {
-        syntax.term("namespace"), syntax.token("id"), syntax.token("endl"), syntax.ref("decl-stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "using-stmt" : {
-        syntax.term("using"), syntax.ref("using-list"), syntax.ref("endline")
-    },
-    "using-list" : {
-        syntax.ref("module-list"), syntax.optional(syntax.term(","), syntax.ref("using-list"))
-    },
-    "if-stmt" : {
-        syntax.term("if"), syntax.ref("basic-expr"), syntax.token("endl"), syntax.ref("stmts"), syntax.repeat(syntax.ref("else-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax.token("endl")
-    },
-    "else-stmt" : {
-        syntax.term("else"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.term("if"), syntax.ref("basic-expr")), syntax.token("endl")
-    },
-    "switch-stmt" : {
-        syntax.term("switch"), syntax.ref("basic-expr"), syntax.token("endl"), syntax.ref("switch-stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "switch-stmts" : {
-        syntax.repeat(syntax.cond_or({syntax.ref("switch-case")}, {syntax.ref("switch-default")}), syntax.repeat(syntax.token("endl")))
-    },
-    "switch-case" : {
-        syntax.term("case"), syntax.ref("logic-or-expr"), syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "switch-default" : {
-        syntax.term("default"), syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "while-stmt" : {
-        syntax.term("while"), syntax.ref("basic-expr"), syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "loop-stmt" : {
-        syntax.term("loop"), syntax.token("endl"), syntax.ref("stmts"), syntax.cond_or({syntax.ref("until-stmt")}, {syntax.term("end"), syntax.token("endl")})
-    },
-    "until-stmt" : {
-        syntax.term("until"), syntax.ref("basic-expr"), syntax.token("endl")
-    },
-    "for-stmt" : {
-        syntax.term("for"), syntax.optional(syntax.ref("var-def")), syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), syntax.optional(syntax.ref("basic-expr")), syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), syntax.optional(syntax.ref("basic-expr")), syntax.ref("for-body")
-    },
-    "foreach-stmt" : {
-        syntax.term("foreach"), syntax.optional(syntax.nlook(syntax.term("in")), syntax.token("id")), syntax.term("in"), syntax.ref("basic-expr"), syntax.ref("for-body")
-    },
-    "for-body" : {syntax.cond_or(
-        {syntax.term("do"), syntax.ref("basic-expr"), syntax.ref("endline")},
-        {syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")}
-    )},
-    "function-stmt" : {
-        syntax.term("function"), syntax.token("id"), syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"), syntax.optional(syntax.term("override")), syntax.ref("function-body")
-    },
-    "function-body" : {syntax.cond_or(
-        {syntax.term("{"), syntax.ref("stmts"), syntax.term("}")},
-        {syntax.token("endl"), syntax.ref("stmts"), syntax.term("end"), syntax.token("endl")}
-    )},
-    "return-stmt" : {
-        syntax.term("return"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("expr")), syntax.ref("endline")
-    },
-    "try-stmt" : {
-        syntax.term("try"), syntax.token("endl"), syntax.ref("stmts"), syntax.repeat(syntax.ref("catch-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax.token("endl")
-    },
-    "catch-stmt" : {
-        syntax.term("catch"), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax.token("endl")
-    },
-    "throw-stmt" : {
-        syntax.term("throw"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("expr")), syntax.ref("endline")
-    },
-    "class-stmt" : {
-        syntax.cond_or({syntax.term("class")}, {syntax.term("struct")}), syntax.token("id"), syntax.optional(syntax.term("extends"), syntax.ref("visit-expr")), syntax.token("endl"),
-        syntax.ref("decl-stmts"), syntax.term("end"), syntax.token("endl")
-    },
-    "async-function-stmt" : {
-        syntax.term("async"), syntax.term("function"), syntax.token("id"),
-        syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"),
-        syntax.optional(syntax.term("override")), syntax.ref("function-body")
-    },
-    "yield-stmt" : {
-        syntax.term("yield"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("expr")), syntax.ref("endline")
-    },
-    "control-stmt" : {
-        syntax.cond_or({syntax.term("break")}, {syntax.term("continue")}), syntax.ref("endline")
-    },
-    "expr-stmt" : {
-        syntax.ref("expr"), syntax.ref("endline")
-    },
-    "end-stmt" : {
-        syntax.term("end"), syntax.token("endl")
-    },
-    # Expression
-    "expr" : {
-        syntax.ref("basic-expr"), syntax.optional(syntax.term(","), syntax.ref("expr"))
-    },
-    "bind-expr" : {
-        syntax.term("("), syntax.ref("bind-list"), syntax.repeat(syntax.term(","), syntax.ref("bind-list")), syntax.term(")")
-    },
-    "bind-list" : {syntax.cond_or(
-        {syntax.token("id")},
-        {syntax.term("...")},
-        {syntax.ref("bind-expr")}
-    )},
-    "basic-expr" : {syntax.cond_or(
-        {syntax.ref("bind-expr"), syntax.term("="), syntax.ref("cond-expr")},
-        {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), syntax.ref("basic-expr"))}
-    )},
-    "asi-op" : {syntax.cond_or(
-        {syntax.term("=")},
-        {syntax.term(":=")},
-        {syntax.term("+=")},
-        {syntax.term("-=")},
-        {syntax.term("*=")},
-        {syntax.term("/=")},
-        {syntax.term("%=")},
-        {syntax.term("^=")}
-    )},
-    "async-lambda-expr" : {
-        syntax.term("async"), syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"),
-        syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"),
-        syntax.ref("lambda-body")
-    },
-    "lambda-expr" : {
-        syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"), syntax.term("("), syntax.optional(syntax.ref("argument-list")), syntax.term(")"), syntax.ref("lambda-body")
-    },
-    "capture-list" : {
-        syntax.optional(syntax.term("=")), syntax.token("id"), syntax.repeat(syntax.term(","), syntax.ref("capture-list"))
-    },
-    "argument-list" : {syntax.cond_or(
-        {syntax.term("..."), syntax.token("id")},
-        {syntax.optional(syntax.term("=")), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax.repeat(syntax.term(","), syntax.ref("argument-list"))}
-    )},
-    "lambda-body" : {syntax.cond_or(
-        {syntax.term("{"), syntax.repeat(syntax.ref("statement"), syntax.repeat(syntax.token("endl"))), syntax.term("}")},
-        {syntax.term("->"), syntax.ref("cond-expr")}
-    )},
-    "cond-expr" : {syntax.cond_or(
-        {syntax.ref("async-lambda-expr")},
-        {syntax.ref("lambda-expr")},
-        {syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))}
-    )},
-    "cond-postfix" : {syntax.cond_or(
-        {syntax.term("?"), syntax.ref("value-expr"), syntax.term(":"), syntax.ref("cond-expr")},
-        {syntax.term(":"), syntax.ref("value-expr")}
-    )},
-    "value-expr" : {syntax.cond_or(
-        {syntax.ref("async-lambda-expr")},
-        {syntax.ref("lambda-expr")},
-        {syntax.ref("logic-or-expr")}
-    )},
-    "logic-or-expr" : {
-        syntax.ref("logic-and-expr"), syntax.optional(syntax.cond_or({syntax.term("||")}, {syntax.term("or")}), syntax.ref("logic-or-expr"))
-    },
-    "logic-and-expr" : {
-        syntax.ref("equal-expr"), syntax.optional(syntax.cond_or({syntax.term("&&")}, {syntax.term("and")}), syntax.ref("logic-and-expr"))
-    },
-    "equal-expr" : {
-        syntax.ref("relat-expr"), syntax.optional(syntax.cond_or({syntax.term("==")}, {syntax.term("!=")}, {syntax.term("is")}, {syntax.term("not")}), syntax.ref("equal-expr"))
-    },
-    "relat-expr" : {
-        syntax.ref("add-expr"), syntax.optional(syntax.cond_or({syntax.term(">")}, {syntax.term("<")}, {syntax.term(">=")}, {syntax.term("<=")}), syntax.ref("relat-expr"))
-    },
-    "add-expr" : {
-        syntax.ref("mul-expr"), syntax.optional(syntax.cond_or({syntax.term("+")}, {syntax.term("-")}), syntax.ref("add-expr"))
-    },
-    "mul-expr" : {
-        syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), syntax.ref("mul-expr"))
-    },
-    "conv-expr" : {
-        syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), syntax.ref("visit-expr"))
-    },
-    "unary-expr" : {syntax.cond_or(
-        {syntax.ref("unary-op"), syntax.ref("unary-expr")},
-        {syntax.cond_or({syntax.term("new")}, {syntax.term("gcnew")}), syntax.ref("visit-expr"), syntax.optional(syntax.ref("array"))},
-        {syntax.ref("prim-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("postfix-expr"))}
-    )},
-    "unary-op" : {syntax.cond_or(
-        {syntax.term("typeid")},
-        {syntax.term("++")},
-        {syntax.term("--")},
-        {syntax.term("*")},
-        {syntax.term("&")},
-        {syntax.term("-")},
-        {syntax.term("!")},
-        {syntax.term("not")}
-    )},
-    "postfix-expr" : {
-        syntax.cond_or({syntax.term("++")}, {syntax.term("--")}, {syntax.term("...")}), syntax.optional(syntax.ref("postfix-expr"))
-    },
-    "await-expr" : {
-        syntax.term("await"), syntax.ref("unary-expr")
-    },
-    "prim-expr" : {syntax.cond_or(
-        {syntax.ref("await-expr")},
-        {syntax.ref("visit-expr")},
-        {syntax.ref("constant")}
-    )},
-    "visit-expr" : {
-        syntax.ref("object"), syntax.optional(syntax.cond_or({syntax.term("->")}, {syntax.term(".")}), syntax.ref("visit-expr"))
-    },
-    "object" : {syntax.cond_or(
-        {syntax.ref("array"), syntax.optional(syntax.ref("index"))},
-        {syntax.token("str"), syntax.optional(syntax.ref("index"))},
-        {syntax.term("local")},
-        {syntax.term("global")},
-        {syntax.ref("ecsx-extend")},
-        {syntax.ref("element")},
-        {syntax.token("char")}
-    )},
-    "ecsx-extend" : {
-        syntax.token("id"), syntax.nlook(syntax.token("endl")), syntax.term("::"), syntax.token("id"), syntax.term("("), syntax.optional(syntax.ref("basic-expr")), syntax.term(")")
-    },
-    "element" : {
-        syntax.cond_or({syntax.token("id")}, {syntax.term("("), syntax.ref("basic-expr"), syntax.term(")")}),
-        syntax.repeat(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))
-    },
-    "constant" : {syntax.cond_or(
-        {syntax.token("num")},
-        {syntax.term("null")},
-        {syntax.term("true")},
-        {syntax.term("false")}
-    )},
-    "array" : {
-        syntax.term("{"), syntax.optional(syntax.ref("expr")), syntax.term("}")
-    },
-    "fcall" : {
-        syntax.term("("), syntax.optional(syntax.ref("expr")), syntax.term(")")
-    },
-    "index" : {syntax.cond_or(
-        {syntax.term("["), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")))), syntax.term("]")},
-        {syntax.term("["), syntax.term("::"), syntax.term("]")}
-    )}
-}.to_hash_map()
-@end
-
-# ============================================================
-#  Format-specific syntax — comments are explicit "com" tokens
-# ============================================================
-
-function get_fmt_syntax()
+function get_syntax(strict)
+    var syntax_eol_fn = null
+    var syntax_eos_fn = null
+    var syntax_nl_fn = null
+    if strict
+        syntax_eol_fn = []()->syntax.ref("eol")
+        syntax_eos_fn = []()->syntax.ref("eos")
+        syntax_nl_fn = []()->{syntax.ref("nl")}
+    else
+        syntax_eol_fn = []()->syntax.token("endl")
+        syntax_eos_fn = []()->syntax.token("endl")
+        syntax_nl_fn = []()->{}
+    end
     @begin
-    return {
-        # === Helper rules (NO ignore rule — all newlines are explicit) ===
-        # nl: zero or more newlines (for multi-line expressions)
+    var stx = {
+        # Helper: newlines within multi-line expressions
+        # non-strict: ignore eats endl -> nl matches zero (no-op)
+        # strict: no ignore -> nl consumes visible endl tokens
         "nl" : {syntax.repeat(syntax.token("endl"))},
-        # eol: end-of-statement-line = optional inline comment + newline
-        "eol" : {syntax.optional(syntax.token("com")), syntax.token("endl")},
-        # eos: statement separator = standalone comment line OR blank line
-        "eos" : {syntax.cond_or(
-            {syntax.token("com"), syntax.token("endl")},
-            {syntax.token("endl")}
-        )},
-        # endline: eol or semicolon
-        "endline" : {syntax.cond_or(
-            {syntax.ref("eol")},
-            {syntax.term(";")}
-        )},
-        # === Bootstrap ===
+        # Beginning of Parsing
         "begin" : {
             syntax.ref("stmts")
         },
+        # End of Line
+        "endline" : {syntax.cond_or(
+            {syntax_eol_fn()},
+            {syntax.term(";")}
+        )},
+        # Bootstrap
         "stmts" : {
-            syntax.repeat(syntax.ref("eos")),
-            syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax.ref("eos")))
+            syntax.repeat(syntax_eos_fn()),
+            syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("statement"), syntax.repeat(syntax_eos_fn()))
         },
         "decl-stmts" : {
-            syntax.repeat(syntax.ref("eos")),
-            syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("declaration"), syntax.repeat(syntax.ref("eos")))
+            syntax.repeat(syntax_eos_fn()),
+            syntax.repeat(syntax.nlook(syntax.ref("endblock")), syntax.ref("declaration"), syntax.repeat(syntax_eos_fn()))
         },
         "endblock" : {syntax.cond_or(
             {syntax.ref("end-stmt")},
@@ -453,9 +125,9 @@ function get_fmt_syntax()
             {syntax.ref("function-stmt")},
             {syntax.ref("class-stmt")}
         )},
-        # === Simple statements ===
+        # Statements
         "prep-stmt" : {
-            syntax.token("prep"), syntax.ref("eol")
+            syntax.token("prep"), syntax_eol_fn()
         },
         "package-stmt" : {
             syntax.term("package"), syntax.token("id"), syntax.ref("endline")
@@ -470,13 +142,13 @@ function get_fmt_syntax()
             syntax.ref("module-list"), syntax.optional(syntax.term("as"), syntax.token("id")), syntax.optional(syntax.term(","), syntax.ref("import-list"))
         },
         "var-def" : {
-            syntax.cond_or({syntax.ref("var-bind"), syntax.term("="), syntax.ref("nl"), syntax.ref("basic-expr")}, {syntax.ref("var-list")})
+            syntax.cond_or({syntax.ref("var-bind"), syntax.term("="), (syntax_nl_fn())..., syntax.ref("basic-expr")}, {syntax.ref("var-list")})
         },
         "var-stmt" : {
             syntax.cond_or({syntax.term("var")}, {syntax.term("link")}, {syntax.term("constant")}), syntax.ref("var-def"), syntax.ref("endline")
         },
         "var-bind" : {
-            syntax.term("("), syntax.ref("nl"), syntax.ref("var-bind-list"), syntax.repeat(syntax.term(","), syntax.ref("nl"), syntax.ref("var-bind-list")), syntax.ref("nl"), syntax.term(")")
+            syntax.term("("), (syntax_nl_fn())..., syntax.ref("var-bind-list"), syntax.repeat(syntax.term(","), (syntax_nl_fn())..., syntax.ref("var-bind-list")), (syntax_nl_fn())..., syntax.term(")")
         },
         "var-bind-list" : {syntax.cond_or(
             {syntax.token("id")},
@@ -485,9 +157,15 @@ function get_fmt_syntax()
         )},
         "var-list" : {
             syntax.token("id"), syntax.cond_or(
-                {syntax.term("="), syntax.ref("nl"), syntax.ref("basic-expr")},
+                {syntax.term("="), (syntax_nl_fn())..., syntax.ref("basic-expr")},
                 {syntax.term("as"), syntax.ref("unary-expr"), syntax.optional(syntax.ref("array"))}
-            ), syntax.optional(syntax.term(","), syntax.ref("nl"), syntax.ref("var-list"))
+            ), syntax.optional(syntax.term(","), (syntax_nl_fn())..., syntax.ref("var-list"))
+        },
+        "block-stmt" : {
+            syntax.term("block"), syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()
+        },
+        "namespace-stmt" : {
+            syntax.term("namespace"), syntax.token("id"), syntax_eol_fn(), syntax.ref("decl-stmts"), syntax.term("end"), syntax_eol_fn()
         },
         "using-stmt" : {
             syntax.term("using"), syntax.ref("using-list"), syntax.ref("endline")
@@ -495,106 +173,94 @@ function get_fmt_syntax()
         "using-list" : {
             syntax.ref("module-list"), syntax.optional(syntax.term(","), syntax.ref("using-list"))
         },
-        "control-stmt" : {
-            syntax.cond_or({syntax.term("break")}, {syntax.term("continue")}), syntax.ref("endline")
-        },
-        "expr-stmt" : {
-            syntax.ref("expr"), syntax.ref("endline")
-        },
-        "return-stmt" : {
-            syntax.term("return"), syntax.optional(syntax.nlook(syntax.ref("eol")), syntax.ref("expr")), syntax.ref("endline")
-        },
-        "throw-stmt" : {
-            syntax.term("throw"), syntax.optional(syntax.nlook(syntax.ref("eol")), syntax.ref("expr")), syntax.ref("endline")
-        },
-        "yield-stmt" : {
-            syntax.term("yield"), syntax.optional(syntax.nlook(syntax.ref("eol")), syntax.ref("expr")), syntax.ref("endline")
-        },
-        # === Block statements ===
-        "block-stmt" : {
-            syntax.term("block"), syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")
-        },
-        "namespace-stmt" : {
-            syntax.term("namespace"), syntax.token("id"), syntax.ref("eol"), syntax.ref("decl-stmts"), syntax.term("end"), syntax.ref("eol")
-        },
         "if-stmt" : {
-            syntax.term("if"), syntax.ref("basic-expr"), syntax.ref("eol"), syntax.ref("stmts"), syntax.repeat(syntax.ref("else-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax.ref("eol")
+            syntax.term("if"), syntax.ref("basic-expr"), syntax_eol_fn(), syntax.ref("stmts"), syntax.repeat(syntax.ref("else-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax_eol_fn()
         },
         "else-stmt" : {
-            syntax.term("else"), syntax.optional(syntax.nlook(syntax.ref("eol")), syntax.term("if"), syntax.ref("basic-expr")), syntax.ref("eol")
+            syntax.term("else"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.term("if"), syntax.ref("basic-expr")), syntax_eol_fn()
         },
         "switch-stmt" : {
-            syntax.term("switch"), syntax.ref("basic-expr"), syntax.ref("eol"), syntax.ref("switch-stmts"), syntax.term("end"), syntax.ref("eol")
+            syntax.term("switch"), syntax.ref("basic-expr"), syntax_eol_fn(), syntax.ref("switch-stmts"), syntax.term("end"), syntax_eol_fn()
         },
         "switch-stmts" : {
-            syntax.repeat(syntax.ref("eos")),
-            syntax.repeat(syntax.cond_or({syntax.ref("switch-case")}, {syntax.ref("switch-default")}), syntax.repeat(syntax.ref("eos")))
+            syntax.repeat(syntax_eos_fn()),
+            syntax.repeat(syntax.cond_or({syntax.ref("switch-case")}, {syntax.ref("switch-default")}), syntax.repeat(syntax_eos_fn()))
         },
         "switch-case" : {
-            syntax.term("case"), syntax.ref("logic-or-expr"), syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")
+            syntax.term("case"), syntax.ref("logic-or-expr"), syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()
         },
         "switch-default" : {
-            syntax.term("default"), syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")
+            syntax.term("default"), syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()
         },
         "while-stmt" : {
-            syntax.term("while"), syntax.ref("basic-expr"), syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")
+            syntax.term("while"), syntax.ref("basic-expr"), syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()
         },
         "loop-stmt" : {
-            syntax.term("loop"), syntax.ref("eol"), syntax.ref("stmts"), syntax.cond_or({syntax.ref("until-stmt")}, {syntax.term("end"), syntax.ref("eol")})
+            syntax.term("loop"), syntax_eol_fn(), syntax.ref("stmts"), syntax.cond_or({syntax.ref("until-stmt")}, {syntax.term("end"), syntax_eol_fn()})
         },
         "until-stmt" : {
-            syntax.term("until"), syntax.ref("basic-expr"), syntax.ref("eol")
+            syntax.term("until"), syntax.ref("basic-expr"), syntax_eol_fn()
         },
         "for-stmt" : {
-            syntax.term("for"), syntax.optional(syntax.ref("var-def")),
-            syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), syntax.ref("nl"),
-            syntax.optional(syntax.ref("basic-expr")),
-            syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), syntax.ref("nl"),
-            syntax.optional(syntax.ref("basic-expr")),
-            syntax.ref("for-body")
+            syntax.term("for"), syntax.optional(syntax.ref("var-def")), syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), (syntax_nl_fn())..., syntax.optional(syntax.ref("basic-expr")), syntax.cond_or({syntax.term(";")}, {syntax.term(",")}), (syntax_nl_fn())..., syntax.optional(syntax.ref("basic-expr")), syntax.ref("for-body")
         },
         "foreach-stmt" : {
             syntax.term("foreach"), syntax.optional(syntax.nlook(syntax.term("in")), syntax.token("id")), syntax.term("in"), syntax.ref("basic-expr"), syntax.ref("for-body")
         },
         "for-body" : {syntax.cond_or(
             {syntax.term("do"), syntax.ref("basic-expr"), syntax.ref("endline")},
-            {syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")}
+            {syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()}
         )},
-        "try-stmt" : {
-            syntax.term("try"), syntax.ref("eol"), syntax.ref("stmts"), syntax.repeat(syntax.ref("catch-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax.ref("eol")
-        },
-        "catch-stmt" : {
-            syntax.term("catch"), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax.ref("eol")
-        },
         "function-stmt" : {
-            syntax.term("function"), syntax.token("id"), syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("argument-list")), syntax.ref("nl"), syntax.term(")"), syntax.optional(syntax.term("override")), syntax.ref("function-body")
-        },
-        "async-function-stmt" : {
-            syntax.term("async"), syntax.term("function"), syntax.token("id"),
-            syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("argument-list")), syntax.ref("nl"), syntax.term(")"),
-            syntax.optional(syntax.term("override")), syntax.ref("function-body")
+            syntax.term("function"), syntax.token("id"), syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("argument-list")), (syntax_nl_fn())..., syntax.term(")"), syntax.optional(syntax.term("override")), syntax.ref("function-body")
         },
         "function-body" : {syntax.cond_or(
             {syntax.term("{"), syntax.ref("stmts"), syntax.term("}")},
-            {syntax.ref("eol"), syntax.ref("stmts"), syntax.term("end"), syntax.ref("eol")}
+            {syntax_eol_fn(), syntax.ref("stmts"), syntax.term("end"), syntax_eol_fn()}
         )},
+        "return-stmt" : {
+            syntax.term("return"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.ref("expr")), syntax.ref("endline")
+        },
+        "try-stmt" : {
+            syntax.term("try"), syntax_eol_fn(), syntax.ref("stmts"), syntax.repeat(syntax.ref("catch-stmt"), syntax.ref("stmts")), syntax.term("end"), syntax_eol_fn()
+        },
+        "catch-stmt" : {
+            syntax.term("catch"), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax_eol_fn()
+        },
+        "throw-stmt" : {
+            syntax.term("throw"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.ref("expr")), syntax.ref("endline")
+        },
         "class-stmt" : {
-            syntax.cond_or({syntax.term("class")}, {syntax.term("struct")}), syntax.token("id"), syntax.optional(syntax.term("extends"), syntax.ref("visit-expr")), syntax.ref("eol"),
-            syntax.ref("decl-stmts"), syntax.term("end"), syntax.ref("eol")
+            syntax.cond_or({syntax.term("class")}, {syntax.term("struct")}), syntax.token("id"), syntax.optional(syntax.term("extends"), syntax.ref("visit-expr")), syntax_eol_fn(),
+            syntax.ref("decl-stmts"), syntax.term("end"), syntax_eol_fn()
+        },
+        "async-function-stmt" : {
+            syntax.term("async"), syntax.term("function"), syntax.token("id"),
+            syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("argument-list")), (syntax_nl_fn())..., syntax.term(")"),
+            syntax.optional(syntax.term("override")), syntax.ref("function-body")
+        },
+        "yield-stmt" : {
+            syntax.term("yield"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.ref("expr")), syntax.ref("endline")
+        },
+        "control-stmt" : {
+            syntax.cond_or({syntax.term("break")}, {syntax.term("continue")}), syntax.ref("endline")
+        },
+        "expr-stmt" : {
+            syntax.ref("expr"), syntax.ref("endline")
         },
         "end-stmt" : {
-            syntax.term("end"), syntax.ref("eol")
+            syntax.term("end"), syntax_eol_fn()
         },
-        # === Expressions (nl allows multi-line; nlook(endl) prevents ambiguous continuation) ===
+        # Expression
         "expr" : {
-            syntax.ref("basic-expr"), syntax.optional(syntax.term(","), syntax.ref("nl"), syntax.ref("expr"))
+            syntax.ref("basic-expr"), syntax.optional(syntax.term(","), (syntax_nl_fn())..., syntax.ref("expr"))
         },
         "basic-expr" : {syntax.cond_or(
-            {syntax.ref("bind-expr"), syntax.term("="), syntax.ref("nl"), syntax.ref("cond-expr")},
-            {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), syntax.ref("nl"), syntax.ref("basic-expr"))}
+            {syntax.ref("bind-expr"), syntax.term("="), (syntax_nl_fn())..., syntax.ref("cond-expr")},
+            {syntax.ref("cond-expr"), syntax.optional(syntax.ref("asi-op"), (syntax_nl_fn())..., syntax.ref("basic-expr"))}
         )},
         "bind-expr" : {
-            syntax.term("("), syntax.ref("nl"), syntax.ref("bind-list"), syntax.repeat(syntax.term(","), syntax.ref("nl"), syntax.ref("bind-list")), syntax.ref("nl"), syntax.term(")")
+            syntax.term("("), (syntax_nl_fn())..., syntax.ref("bind-list"), syntax.repeat(syntax.term(","), (syntax_nl_fn())..., syntax.ref("bind-list")), (syntax_nl_fn())..., syntax.term(")")
         },
         "bind-list" : {syntax.cond_or(
             {syntax.token("id")},
@@ -613,20 +279,18 @@ function get_fmt_syntax()
         )},
         "async-lambda-expr" : {
             syntax.term("async"), syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"),
-            syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("argument-list")), syntax.ref("nl"), syntax.term(")"),
+            syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("argument-list")), (syntax_nl_fn())..., syntax.term(")"),
             syntax.ref("lambda-body")
         },
         "lambda-expr" : {
-            syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"),
-            syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("argument-list")), syntax.ref("nl"), syntax.term(")"),
-            syntax.ref("lambda-body")
+            syntax.term("["), syntax.optional(syntax.ref("capture-list")), syntax.term("]"), syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("argument-list")), (syntax_nl_fn())..., syntax.term(")"), syntax.ref("lambda-body")
         },
         "capture-list" : {
-            syntax.optional(syntax.term("=")), syntax.token("id"), syntax.repeat(syntax.term(","), syntax.ref("nl"), syntax.ref("capture-list"))
+            syntax.optional(syntax.term("=")), syntax.token("id"), syntax.repeat(syntax.term(","), (syntax_nl_fn())..., syntax.ref("capture-list"))
         },
         "argument-list" : {syntax.cond_or(
             {syntax.term("..."), syntax.token("id")},
-            {syntax.optional(syntax.term("=")), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax.repeat(syntax.term(","), syntax.ref("nl"), syntax.ref("argument-list"))}
+            {syntax.optional(syntax.term("=")), syntax.token("id"), syntax.optional(syntax.term(":"), syntax.ref("visit-expr")), syntax.repeat(syntax.term(","), (syntax_nl_fn())..., syntax.ref("argument-list"))}
         )},
         "lambda-body" : {syntax.cond_or(
             {syntax.term("{"), syntax.ref("stmts"), syntax.term("}")},
@@ -638,8 +302,8 @@ function get_fmt_syntax()
             {syntax.ref("logic-or-expr"), syntax.optional(syntax.ref("cond-postfix"))}
         )},
         "cond-postfix" : {syntax.cond_or(
-            {syntax.term("?"), syntax.ref("nl"), syntax.ref("value-expr"), syntax.term(":"), syntax.ref("nl"), syntax.ref("cond-expr")},
-            {syntax.term(":"), syntax.ref("nl"), syntax.ref("value-expr")}
+            {syntax.term("?"), (syntax_nl_fn())..., syntax.ref("value-expr"), syntax.term(":"), (syntax_nl_fn())..., syntax.ref("cond-expr")},
+            {syntax.term(":"), (syntax_nl_fn())..., syntax.ref("value-expr")}
         )},
         "value-expr" : {syntax.cond_or(
             {syntax.ref("async-lambda-expr")},
@@ -647,25 +311,25 @@ function get_fmt_syntax()
             {syntax.ref("logic-or-expr")}
         )},
         "logic-or-expr" : {
-            syntax.ref("logic-and-expr"), syntax.optional(syntax.cond_or({syntax.term("||")}, {syntax.term("or")}), syntax.ref("nl"), syntax.ref("logic-or-expr"))
+            syntax.ref("logic-and-expr"), syntax.optional(syntax.cond_or({syntax.term("||")}, {syntax.term("or")}), (syntax_nl_fn())..., syntax.ref("logic-or-expr"))
         },
         "logic-and-expr" : {
-            syntax.ref("equal-expr"), syntax.optional(syntax.cond_or({syntax.term("&&")}, {syntax.term("and")}), syntax.ref("nl"), syntax.ref("logic-and-expr"))
+            syntax.ref("equal-expr"), syntax.optional(syntax.cond_or({syntax.term("&&")}, {syntax.term("and")}), (syntax_nl_fn())..., syntax.ref("logic-and-expr"))
         },
         "equal-expr" : {
-            syntax.ref("relat-expr"), syntax.optional(syntax.cond_or({syntax.term("==")}, {syntax.term("!=")}, {syntax.term("is")}, {syntax.term("not")}), syntax.ref("nl"), syntax.ref("equal-expr"))
+            syntax.ref("relat-expr"), syntax.optional(syntax.cond_or({syntax.term("==")}, {syntax.term("!=")}, {syntax.term("is")}, {syntax.term("not")}), (syntax_nl_fn())..., syntax.ref("equal-expr"))
         },
         "relat-expr" : {
-            syntax.ref("add-expr"), syntax.optional(syntax.cond_or({syntax.term(">")}, {syntax.term("<")}, {syntax.term(">=")}, {syntax.term("<=")}), syntax.ref("nl"), syntax.ref("relat-expr"))
+            syntax.ref("add-expr"), syntax.optional(syntax.cond_or({syntax.term(">")}, {syntax.term("<")}, {syntax.term(">=")}, {syntax.term("<=")}), (syntax_nl_fn())..., syntax.ref("relat-expr"))
         },
         "add-expr" : {
-            syntax.ref("mul-expr"), syntax.optional(syntax.cond_or({syntax.term("+")}, {syntax.term("-")}), syntax.ref("nl"), syntax.ref("add-expr"))
+            syntax.ref("mul-expr"), syntax.optional(syntax.cond_or({syntax.term("+")}, {syntax.term("-")}), (syntax_nl_fn())..., syntax.ref("add-expr"))
         },
         "mul-expr" : {
-            syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), syntax.ref("nl"), syntax.ref("mul-expr"))
+            syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), (syntax_nl_fn())..., syntax.ref("mul-expr"))
         },
         "conv-expr" : {
-            syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), syntax.ref("nl"), syntax.ref("visit-expr"))
+            syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), (syntax_nl_fn())..., syntax.ref("visit-expr"))
         },
         "unary-expr" : {syntax.cond_or(
             {syntax.ref("unary-op"), syntax.ref("unary-expr")},
@@ -694,7 +358,7 @@ function get_fmt_syntax()
             {syntax.ref("constant")}
         )},
         "visit-expr" : {
-            syntax.ref("object"), syntax.optional(syntax.cond_or({syntax.term("->")}, {syntax.term(".")}), syntax.ref("nl"), syntax.ref("visit-expr"))
+            syntax.ref("object"), syntax.optional(syntax.cond_or({syntax.term("->")}, {syntax.term(".")}), (syntax_nl_fn())..., syntax.ref("visit-expr"))
         },
         "object" : {syntax.cond_or(
             {syntax.ref("array"), syntax.optional(syntax.ref("index"))},
@@ -706,11 +370,10 @@ function get_fmt_syntax()
             {syntax.token("char")}
         )},
         "ecsx-extend" : {
-            syntax.token("id"), syntax.nlook(syntax.token("endl")), syntax.term("::"), syntax.token("id"),
-            syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("basic-expr")), syntax.ref("nl"), syntax.term(")")
+            syntax.token("id"), syntax.nlook(syntax.token("endl")), syntax.term("::"), syntax.token("id"), syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("basic-expr")), (syntax_nl_fn())..., syntax.term(")")
         },
         "element" : {
-            syntax.cond_or({syntax.token("id")}, {syntax.term("("), syntax.ref("nl"), syntax.ref("basic-expr"), syntax.ref("nl"), syntax.term(")")}),
+            syntax.cond_or({syntax.token("id")}, {syntax.term("("), (syntax_nl_fn())..., syntax.ref("basic-expr"), (syntax_nl_fn())..., syntax.term(")")}),
             syntax.repeat(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))
         },
         "constant" : {syntax.cond_or(
@@ -720,54 +383,34 @@ function get_fmt_syntax()
             {syntax.term("false")}
         )},
         "array" : {
-            syntax.term("{"), syntax.ref("nl"), syntax.optional(syntax.ref("expr")), syntax.ref("nl"), syntax.term("}")
+            syntax.term("{"), (syntax_nl_fn())..., syntax.optional(syntax.ref("expr")), (syntax_nl_fn())..., syntax.term("}")
         },
         "fcall" : {
-            syntax.term("("), syntax.ref("nl"), syntax.optional(syntax.ref("expr")), syntax.ref("nl"), syntax.term(")")
+            syntax.term("("), (syntax_nl_fn())..., syntax.optional(syntax.ref("expr")), (syntax_nl_fn())..., syntax.term(")")
         },
         "index" : {syntax.cond_or(
-            {syntax.term("["), syntax.ref("nl"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.ref("nl"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.ref("nl"), syntax.optional(syntax.ref("add-expr")))), syntax.ref("nl"), syntax.term("]")},
+            {syntax.term("["), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")), syntax.optional(syntax.term(":"), syntax.optional(syntax.ref("add-expr")))), syntax.term("]")},
             {syntax.term("["), syntax.term("::"), syntax.term("]")}
         )}
     }.to_hash_map()
     @end
-end
-
-function get_fmt_grammar()
-    var g = new parsergen.grammar
-    g.ext = ".*\\.(csp|csc|ecs|ecsx)"
-    g.lex = get_fmt_lexical(regex.build_optimize)
-    g.stx := get_fmt_syntax()
-    return g
-end
-
-# Verify format grammar covers all main grammar rules (call from tests)
-function check_fmt_syntax_sync()
-    var main_stx = covscript_syntax
-    var fmt_stx = get_fmt_syntax()
-    var fmt_extra = new hash_map
-    fmt_extra["nl"] = 1
-    fmt_extra["eos"] = 1
-    fmt_extra["eol"] = 1
-    var main_extra = new hash_map
-    main_extra["ignore"] = 1
-    var missing = new array
-    foreach it in main_stx
-        var name = it.first
-        if !main_extra.exist(name) && !fmt_stx.exist(name)
-            missing.push_back(name)
-        end
+    if strict
+        stx["nl"] = {syntax.repeat(syntax.token("endl"))}
+        stx["eol"] = {syntax.optional(syntax.token("com")), syntax.token("endl")}
+        @begin
+        stx["eos"] = {syntax.cond_or(
+            {syntax.token("com"), syntax.token("endl")},
+            {syntax.token("endl")}
+        )}
+        @end
+    else
+        # Ignore if not match initiatively
+        stx["ignore"] = {syntax.repeat(syntax.token("endl"))}
     end
-    foreach it in fmt_stx
-        var name = it.first
-        if !fmt_extra.exist(name) && !main_stx.exist(name)
-            missing.push_back("fmt-only:" + name)
-        end
-    end
-    return missing
+    return stx
 end
 
 var grammar = new parsergen.grammar
 grammar.ext = ".*\\.(csp|csc|ecs|ecsx)"
-grammar.lex = get_lexical(regex.build_optimize)
-grammar.stx := covscript_syntax
+grammar.lex = get_lexical(regex.build_optimize, false)
+grammar.stx := get_syntax(false)

@@ -22,6 +22,14 @@ package ecs_format
 
 import parsergen, ecs_parser, ecs_lint, regex
 
+function get_fmt_grammar()
+    var g = new parsergen.grammar
+    g.ext = ".*\\.(csp|csc|ecs|ecsx)"
+    g.lex = ecs_parser.get_lexical(regex.build_optimize, true)
+    g.stx := ecs_parser.get_syntax(true)
+    return g
+end
+
 # ============================================================
 #  Format Writer
 # ============================================================
@@ -984,7 +992,7 @@ function format_file(file_name, unicode_cvt)
     if unicode_cvt != null
         parser.unicode_cvt = unicode_cvt
     end
-    parser.add_grammar("ecs-lang-fmt", ecs_parser.get_fmt_grammar())
+    parser.add_grammar("ecs-lang-fmt", get_fmt_grammar())
     parser.from_file(file_name)
     if parser.ast == null
         system.out.println("Error: Failed to parse file '" + file_name + "'.")

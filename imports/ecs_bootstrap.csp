@@ -370,7 +370,7 @@ function setup_unicode(charset)
         return null
     end
     var cvt = codecvt_map.at(cvt_name)(unicode_ext)
-    ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(cvt.local2wide(str)))
+    ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(cvt.local2wide(str)), false)
     if cvt_name == "GBK"
         var wrapper = new gbk_wrapper
         wrapper.codecvt = cvt
@@ -452,15 +452,11 @@ function run_ecs(cmd_args)
             return exit_code
         end
     end
-    # Lint-only mode (uses main grammar, no codegen)
+    # Lint-only mode (lint_file does its own parsing)
     if lint_only
-        parser.add_grammar("ecs-lang", ecs_parser.grammar)
-        parser.from_file(file_name)
-        if parser.ast != null
-            var result = ecs_lint.lint_file(file_name)
-            if result != null
-                result[0].print_report()
-            end
+        var result = ecs_lint.lint_file(file_name)
+        if result != null
+            result[0].print_report()
         end
         return 0
     end
