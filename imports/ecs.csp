@@ -27,6 +27,11 @@ package ecs
 #  Type System
 # ============================================================
 
+struct lambda_base
+    function construct()
+        # Override in derived struct.
+    end
+end
 
 namespace type_validator
     function __type(obj)
@@ -43,7 +48,11 @@ namespace type_validator
     end
     function __function(obj)
         link real_type = sdk.typeids.get_real(obj)
-        return real_type == sdk.typeids.callable || real_type == sdk.typeids.memberfn
+        if real_type == sdk.typeids.callable || real_type == sdk.typeids.memberfn
+            return true
+        else
+            return global.is_a(typeid obj, typeid lambda_base)
+        end
     end
     function __exception(obj)
         return sdk.typeids.get_real(obj) == sdk.typeids.exception

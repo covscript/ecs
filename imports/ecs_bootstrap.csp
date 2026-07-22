@@ -157,6 +157,7 @@ function show_help()
         "   -c            Check grammar only\n" +
         "   -l            Lint check\n" +
         "   -F            Format source file\n" +
+        "   -n            Dry-run format (print to stdout)\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
         "   -o <PATH>     Set output path\n" +
@@ -193,6 +194,7 @@ var csym = false
 var repl = false
 var lint_only = false
 var format_only = false
+var format_dry_run = false
 
 function process_args(cmd_args)
     var index = 1
@@ -225,6 +227,9 @@ function process_args(cmd_args)
             case "-F"
                 format_only = true
                 no_run = true
+            end
+            case "-n"
+                format_dry_run = true
             end
             case "-s"
                 silent = true
@@ -398,6 +403,7 @@ function run_ecs(cmd_args)
     repl = false
     lint_only = false
     format_only = false
+    format_dry_run = false
     exit_code = -1
 
     process_args(cmd_args)
@@ -466,13 +472,17 @@ function run_ecs(cmd_args)
         if unicode != null
             cvt = parser.unicode_cvt
         end
-        var output = ecs_format.format_file(file_name, cvt)
-        if output == null
+        var formatted = ecs_format.format_file(file_name, cvt)
+        if formatted == null
             return 1
         end
-        var ofs = iostream.ofstream(file_name)
-        ofs.print(output)
-        system.out.println(file_name + ": formatted.")
+        if format_dry_run
+            system.out.print(formatted)
+        else
+            var ofs = iostream.ofstream(file_name)
+            ofs.print(formatted)
+            system.out.println(file_name + ": formatted.")
+        end
         return 0
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)

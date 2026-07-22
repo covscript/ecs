@@ -17,8 +17,11 @@ end
 if true
     # empty
 end
-var trailing = 1
+var trailing = 1  
 # === Consecutive blank lines (intentional) ===
+
+
+
 var a = 1
 var b = 2
 # === Useless expression ===

@@ -50,8 +50,8 @@ class format_writer
             return false
         end
         var c = to_integer(text[0])
-        # A-Z, a-z, _, CJK Unified Ideographs U+4E00..U+9FFF
-        return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || (c >= 19968 && c <= 40959)
+        # A-Z, a-z, _, CJK Unified Ideographs, Extension A, Compatibility
+        return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || (c >= 13312 && c <= 40959) || (c >= 63744 && c <= 64255)
     end
 
     function write(text)
