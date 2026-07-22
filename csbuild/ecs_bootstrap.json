@@ -9,6 +9,8 @@
         "parsergen",
         "ecs_parser",
         "ecs_generator",
+        "ecs_lint",
+        "ecs_format",
         "sdk_extension",
         "codec",
         "regex"

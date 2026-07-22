@@ -20,7 +20,7 @@
 
 package ecs_bootstrap
 
-import parsergen, ecs_parser, ecs_generator, codec, regex
+import parsergen, ecs_parser, ecs_generator, ecs_lint, ecs_format, codec, regex
 import sdk_extension as sdk
 
 var wrapper_ver = "1.7.0"
@@ -155,6 +155,8 @@ function show_help()
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
+        "   -l            Lint check\n" +
+        "   -F            Format source file\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
         "   -o <PATH>     Set output path\n" +
@@ -189,6 +191,8 @@ var splash = null
 var output = null
 var csym = false
 var repl = false
+var lint_only = false
+var format_only = false
 
 function process_args(cmd_args)
     var index = 1
@@ -212,6 +216,14 @@ function process_args(cmd_args)
                 minmal = true
             end
             case "-c"
+                no_run = true
+            end
+            case "-l"
+                lint_only = true
+                no_run = true
+            end
+            case "-F"
+                format_only = true
                 no_run = true
             end
             case "-s"
@@ -384,6 +396,8 @@ function run_ecs(cmd_args)
     output = null
     csym = false
     repl = false
+    lint_only = false
+    format_only = false
     exit_code = -1
 
     process_args(cmd_args)
@@ -437,6 +451,33 @@ function run_ecs(cmd_args)
         if exit_code != -1
             return exit_code
         end
+    end
+    # Lint-only mode (uses main grammar, no codegen)
+    if lint_only
+        parser.add_grammar("ecs-lang", ecs_parser.grammar)
+        parser.from_file(file_name)
+        if parser.ast != null
+            var result = ecs_lint.lint_file(file_name)
+            if result != null
+                result[0].print_report()
+            end
+        end
+        return 0
+    end
+    # Format mode (uses format-specific grammar with com tokens)
+    if format_only
+        var cvt = null
+        if unicode != null
+            cvt = parser.unicode_cvt
+        end
+        var output = ecs_format.format_file(file_name, cvt)
+        if output == null
+            return 1
+        end
+        var ofs = iostream.ofstream(file_name)
+        ofs.print(output)
+        system.out.println(file_name + ": formatted.")
+        return 0
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
