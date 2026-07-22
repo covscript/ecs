@@ -31,8 +31,15 @@ function assert_ge(actual, min_expected, msg)
     end
 end
 
-var result = ecs_lint.lint_file("unit_tests/fixtures/test_lint.ecs")
+var result = ecs_lint.lint_file("tests/test_lint.ecs")
 assert(result != null, "lint_file returns non-null result")
+if result == null
+    system.out.println("Test: lint rules  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+    if failed > 0
+        system.exit(1)
+    end
+    return
+end
 
 var lint = result[0]
 var issues = result[1]
@@ -40,7 +47,6 @@ var issues = result[1]
 assert(typeid lint == typeid ecs_lint.linter, "result[0] is a linter")
 assert(typeid issues == typeid array, "result[1] is an array (issues)")
 
-# Count issues by rule
 var function_naming_count = 0
 var variable_naming_count = 0
 var constant_naming_count = 0
@@ -97,7 +103,6 @@ foreach iss in issues
     end
 end
 
-# Verify expected lint issues
 assert_ge(function_naming_count, 1, "detects function_naming violations")
 assert_ge(variable_naming_count, 1, "detects variable_naming violations")
 assert_ge(constant_naming_count, 1, "detects constant_naming violations")
@@ -107,19 +112,14 @@ assert_ge(empty_block_count, 1, "detects empty_block warnings")
 assert_ge(trailing_whitespace_count, 1, "detects trailing_whitespace warnings")
 assert_ge(consecutive_blank_lines_count, 1, "detects consecutive_blank_lines info")
 
-# Verify severity counts via linter method
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_ERROR), error_count, "count_by_severity(error) matches")
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_WARNING), warning_count, "count_by_severity(warning) matches")
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_INFO), info_count, "count_by_severity(info) matches")
 
-# Verify error/warning counts match issue array
 assert_ge(error_count, 1, "has at least one severity_error")
 assert_ge(warning_count, 5, "has at least five severity_warning")
-
-# Verify total issue count
 assert_ge(issues.size, 6, "total issues >= 6")
 
-# === results ===
 system.out.println("")
 system.out.println("Test: lint rules  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
 if failed > 0
