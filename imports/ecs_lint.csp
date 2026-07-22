@@ -49,8 +49,6 @@ struct lint_context
     var file_name = ""
     var code_buff = new array
     var issues = new array
-    var indent_info = new hash_map
-    var indent_level = 0
 
     function add_issue(pos, message, severity, rule_name)
         var iss = new issue
@@ -99,19 +97,6 @@ function is_upper_snake_case(name)
     return true
 end
 
-function is_comment_or_blank_line(line)
-    # Check if line is blank or comment-only (first non-space char is #)
-    for i = 0, i < line.size, ++i
-        var ch = line[i]
-        if ch == '#'
-            return true  # comment line
-        end
-        if ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n'
-            return false  # has non-space, non-comment content
-        end
-    end
-    return true  # blank line
-end
 
 # ============================================================
 #  Lint Rules
@@ -277,13 +262,6 @@ function rule_unreachable_code(ctx, nodes)
             end
         end
     end
-end
-
-function rule_useless_expression(ctx, nodes)
-    # TODO: Detect expressions whose results are discarded
-    # Requires deep analysis of the expression chain to distinguish
-    # between calls with side effects and pure expressions.
-    # For now, skip this check.
 end
 
 # === Source-level rules (operate on code_buff, not AST) ===
@@ -525,7 +503,6 @@ class linter
     end
 
     function visit_stmts(nodes)
-        this.ctx.indent_level += 1
         # Check unreachable code
         rule_unreachable_code(this.ctx, nodes)
         # Recurse into children
@@ -534,17 +511,14 @@ class linter
                 this.visit_statement(nodes[i].nodes)
             end
         end
-        this.ctx.indent_level -= 1
     end
 
     function visit_decl_stmts(nodes)
-        this.ctx.indent_level += 1
         for i = 0, i < nodes.size, ++i
             if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "declaration"
                 this.visit_declaration(nodes[i].nodes)
             end
         end
-        this.ctx.indent_level -= 1
     end
 
     function visit_statement(nodes)
@@ -569,16 +543,10 @@ class linter
 
     function visit_function_stmt(nodes)
         rule_function_naming(this.ctx, nodes)
-        # Check empty body
         rule_empty_block(this.ctx, nodes)
-        # Recurse into body
         for i = 0, i < nodes.size, ++i
             if typeid nodes[i] == typeid parsergen.syntax_tree
-                if nodes[i].root == "stmts" || nodes[i].root == "function-body"
-                    this.visit_node(nodes[i].nodes)
-                else
-                    this.visit_node(nodes[i].nodes)
-                end
+                this.visit_node(nodes[i].nodes)
             end
         end
     end
@@ -588,11 +556,7 @@ class linter
         rule_empty_block(this.ctx, nodes)
         for i = 0, i < nodes.size, ++i
             if typeid nodes[i] == typeid parsergen.syntax_tree
-                if nodes[i].root == "stmts" || nodes[i].root == "function-body"
-                    this.visit_node(nodes[i].nodes)
-                else
-                    this.visit_node(nodes[i].nodes)
-                end
+                this.visit_node(nodes[i].nodes)
             end
         end
     end
@@ -659,6 +623,7 @@ class linter
     end
 
     function visit_switch_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
         this.visit_node(nodes)
     end
 
@@ -690,6 +655,7 @@ class linter
     end
 
     function visit_block_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
         for i = 0, i < nodes.size, ++i
             if typeid nodes[i] == typeid parsergen.syntax_tree
                 if nodes[i].root == "stmts"
@@ -719,7 +685,6 @@ class linter
     end
 
     function visit_expr_stmt(nodes)
-        rule_useless_expression(this.ctx, nodes)
         this.visit_node(nodes)
     end
 end

@@ -2622,6 +2622,7 @@ class generator
     end
     function repl_run(ast)
         slice_ext = false
+        lambda_base = 0
         indent = -1
         recursion_depth = 0
         async_depth = 0
@@ -2632,14 +2633,16 @@ class generator
         try
             visit_begin(ast.nodes)
         catch e
+            lambda_list = new array
+            stack = new array
+            indent = -1
+            recursion_depth = 0
+            async_depth = 0
+            in_struct_depth = 0
             if e.what == "ECS_ERROR"
-                lambda_list = new array
-                stack = new array
-                indent = -1
-                recursion_depth = 0
-                async_depth = 0
-                in_struct_depth = 0
                 return null
+            else
+                throw e
             end
         end
         var header = new iostream.char_buff

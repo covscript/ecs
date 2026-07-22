@@ -229,6 +229,8 @@ function process_args(cmd_args)
                 no_run = true
             end
             case "-n"
+                format_only = true
+                no_run = true
                 format_dry_run = true
             end
             case "-s"
@@ -463,6 +465,8 @@ function run_ecs(cmd_args)
         var result = ecs_lint.lint_file(file_name)
         if result != null
             result[0].print_report()
+        else
+            return 1
         end
         return 0
     end

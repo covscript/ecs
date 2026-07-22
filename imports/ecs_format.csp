@@ -20,7 +20,7 @@
 
 package ecs_format
 
-import parsergen, ecs_parser, ecs_lint, regex
+import parsergen, ecs_parser, regex
 
 function get_fmt_grammar()
     var g = new parsergen.grammar
@@ -120,9 +120,6 @@ class format_writer
 
     function pop_indent()
         --indent_level
-        if indent_level < 0
-            indent_level = 0
-        end
     end
 
     function token(tok)
@@ -144,14 +141,9 @@ end
 
 class format_visitor
     var w = null
-    var ctx = null
 
     function run(file_name, code_buff, ast)
-        this.ctx = new ecs_lint.lint_context
-        this.ctx.file_name = file_name
-        this.ctx.code_buff = code_buff
         this.w = new format_writer
-        # Walk AST (comments are now first-class "com" tokens)
         this.visit_begin(ast.nodes)
         return this.w.output
     end
@@ -166,9 +158,10 @@ class format_visitor
                     # Standalone comment inside expression (edge case)
                     this.w.write(node.data)
                     this.w.newline()
-                end
-                if node.type != "endl"
-                    this.w.token(node)
+                else
+                    if node.type != "endl"
+                        this.w.token(node)
+                    end
                 end
             end
             if typeid node == typeid parsergen.syntax_tree
@@ -398,6 +391,9 @@ class format_visitor
     # === Top-level ===
 
     function visit_begin(nodes)
+        if nodes.empty()
+            return
+        end
         # stmts is the first/only child of begin
         for idx = 0, idx < nodes[0].nodes.size, ++idx
             var node = nodes[0].nodes[idx]
@@ -469,21 +465,21 @@ class format_visitor
     end
 
     function visit_statement(nodes)
+        if nodes.empty()
+            return
+        end
         var node = nodes[0]
         if typeid node == typeid parsergen.syntax_tree
-            if node.root == "if-stmt" || node.root == "while-stmt" || node.root == "for-stmt" || node.root == "foreach-stmt" || node.root == "loop-stmt" || node.root == "function-stmt" || node.root == "async-function-stmt" || node.root == "try-stmt"
-                ecs_lint.rule_empty_block(this.ctx, node.nodes)
-            end
             this.dispatch(node)
         end
     end
 
     function visit_declaration(nodes)
+        if nodes.empty()
+            return
+        end
         var node = nodes[0]
         if typeid node == typeid parsergen.syntax_tree
-            if node.root == "function-stmt" || node.root == "async-function-stmt" || node.root == "class-stmt"
-                ecs_lint.rule_empty_block(this.ctx, node.nodes)
-            end
             this.dispatch(node)
         end
     end
@@ -763,9 +759,12 @@ class format_visitor
 
     # === Declarations ===
 
-    function visit_function_stmt(nodes)
-        ecs_lint.rule_function_naming(this.ctx, nodes)
+    function visit_function_stmt_impl(nodes, is_async)
         var idx = 0
+        if is_async
+            ++idx; this.w.keyword("async")
+            this.w.space()
+        end
         ++idx; this.w.keyword("function")
         this.w.space()
         this.w.write(nodes[idx++].data)
@@ -788,30 +787,12 @@ class format_visitor
         this.visit_function_body(nodes[idx++].nodes)
     end
 
+    function visit_function_stmt(nodes)
+        this.visit_function_stmt_impl(nodes, false)
+    end
+
     function visit_async_function_stmt(nodes)
-        ecs_lint.rule_async_function_naming(this.ctx, nodes)
-        var idx = 0
-        ++idx; this.w.keyword("async")
-        this.w.space()
-        ++idx; this.w.keyword("function")
-        this.w.space()
-        this.w.write(nodes[idx++].data)
-        ++idx; this.w.write("(")
-        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
-            ++idx
-        end
-        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "argument-list"
-            this.visit_children(nodes[idx++].nodes)
-        end
-        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
-            ++idx
-        end
-        ++idx; this.w.write(")")
-        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "override"
-            this.w.space()
-            ++idx; this.w.write("override")
-        end
-        this.visit_function_body(nodes[idx++].nodes)
+        this.visit_function_stmt_impl(nodes, true)
     end
 
     function visit_function_body(nodes)
@@ -847,7 +828,6 @@ class format_visitor
     end
 
     function visit_class_stmt(nodes)
-        ecs_lint.rule_class_naming(this.ctx, nodes)
         var idx = 0
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
             this.w.keyword(nodes[idx++].data)
@@ -886,7 +866,6 @@ class format_visitor
     end
 
     function visit_var_stmt(nodes)
-        ecs_lint.rule_variable_naming(this.ctx, nodes)
         var idx = 0
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
             this.w.keyword(nodes[idx++].data)
@@ -938,7 +917,6 @@ class format_visitor
 
     function visit_expr_stmt(nodes)
         var idx = 0
-        ecs_lint.rule_useless_expression(this.ctx, nodes)
         this.visit_children(nodes[idx++].nodes)
         this.visit_endline(nodes[idx++].nodes)
     end
