@@ -323,15 +323,15 @@ function get_syntax(strict)
             syntax.ref("mul-expr"), syntax.optional(syntax.cond_or({syntax.term("+")}, {syntax.term("-")}), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("add-expr"))
         },
         "mul-expr" : {
-            syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("mul-expr"))
+            syntax.ref("conv-expr"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.cond_or({syntax.term("*")}, {syntax.term("/")}, {syntax.term("%")}, {syntax.term("^")}), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("mul-expr"))
         },
         "conv-expr" : {
-            syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("visit-expr"))
+            syntax.ref("unary-expr"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.cond_or({syntax.term("=>")}, {syntax.term("as")}), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("visit-expr"))
         },
         "unary-expr" : {syntax.cond_or(
             {syntax.ref("unary-op"), syntax.ref("unary-expr")},
             {syntax.cond_or({syntax.term("new")}, {syntax.term("gcnew")}), syntax.ref("visit-expr"), syntax.optional(syntax.ref("array"))},
-            {syntax.ref("prim-expr"), syntax.optional(syntax.nlook(syntax.token("endl")), syntax.ref("postfix-expr"))}
+            {syntax.ref("prim-expr"), syntax.optional(syntax.nlook(syntax_eol_fn()), syntax.ref("postfix-expr"))}
         )},
         "unary-op" : {syntax.cond_or(
             {syntax.term("typeid")},
@@ -367,11 +367,11 @@ function get_syntax(strict)
             {syntax.token("char")}
         )},
         "ecsx-extend" : {
-            syntax.token("id"), syntax.nlook(syntax.token("endl")), syntax.term("::"), syntax.token("id"), syntax.term("("), (syntax_op_fn(syntax.ref("nl")))..., syntax.optional(syntax.ref("basic-expr")), (syntax_op_fn(syntax.ref("nl")))..., syntax.term(")")
+            syntax.token("id"), syntax.nlook(syntax_eol_fn()), syntax.term("::"), syntax.token("id"), syntax.term("("), (syntax_op_fn(syntax.ref("nl")))..., syntax.optional(syntax.ref("basic-expr")), (syntax_op_fn(syntax.ref("nl")))..., syntax.term(")")
         },
         "element" : {
             syntax.cond_or({syntax.token("id")}, {syntax.term("("), (syntax_op_fn(syntax.ref("nl")))..., syntax.ref("basic-expr"), (syntax_op_fn(syntax.ref("nl")))..., syntax.term(")")}),
-            syntax.repeat(syntax.nlook(syntax.token("endl")), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))
+            syntax.repeat(syntax.nlook(syntax_eol_fn()), syntax.cond_or({syntax.ref("fcall")}, {syntax.ref("index")}))
         },
         "constant" : {syntax.cond_or(
             {syntax.token("num")},

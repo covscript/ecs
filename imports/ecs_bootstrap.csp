@@ -236,8 +236,6 @@ function process_args(cmd_args)
             end
             case "-r"
                 repl = true
-                ++index
-                break
             end
             case "-g"
                 no_hash = true
@@ -271,7 +269,11 @@ function process_args(cmd_args)
                     exit_code = 1
                     return
                 end
-                csx_path = cmd_args[++index]
+                if csx_path == null
+                    csx_path = cmd_args[++index]
+                else
+                    csx_path = csx_path + system.path.delimiter + cmd_args[++index]
+                end
             end
             case "-o"
                 if index == cmd_args.size - 1
@@ -450,6 +452,9 @@ function run_ecs(cmd_args)
                     if name != null && !name.empty()
                         var mtime = ifs.getline().to_number()
                         if mtime == system.file.mtime(file_name)
+                            if csx_path != null
+                                compiler_args += " -i " + csx_path
+                            end
                             return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments))
                         end
                     end
@@ -457,13 +462,6 @@ function run_ecs(cmd_args)
                     # Cache file corrupted or unreadable — fall through to recompile
                 end
             end
-        end
-    end
-    var parser = new parsergen.generator
-    if unicode != null
-        parser.unicode_cvt = setup_unicode(unicode)
-        if exit_code != -1
-            return exit_code
         end
     end
     # Lint-only mode (lint_file does its own parsing)
@@ -475,6 +473,13 @@ function run_ecs(cmd_args)
             return 1
         end
         return 0
+    end
+    var parser = new parsergen.generator
+    if unicode != null
+        parser.unicode_cvt = setup_unicode(unicode)
+        if exit_code != -1
+            return exit_code
+        end
     end
     # Format mode (uses format-specific grammar with com tokens)
     if format_only
@@ -530,7 +535,9 @@ function run_ecs(cmd_args)
                     foreach it in parser.code_buff do csym_ofs.println(it)
                 end
                 if !no_hash
-                    iostream.ofstream("./.ecs_output/" + file_hash).println(target_name)
+                    var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
+                    ofs.println(target_name)
+                    ofs.println(system.file.mtime(file_name))
                 end
                 if splash != null
                     system.out.println(splash)
@@ -561,7 +568,7 @@ function run_ecs(cmd_args)
             return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
         end
     end
-    return 0
+    return 1
 end
 
 function main(cmd_args)

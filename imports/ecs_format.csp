@@ -337,8 +337,13 @@ class format_visitor
             # Unary operators: no space between operator and operand
             if !matched && root == "unary-op"
                 matched = true
-                this.w.write(node.nodes[0].data)
-                this.w.need_space = false
+                var op = node.nodes[0].data
+                this.w.write(op)
+                if op == "typeid" || op == "not"
+                    this.w.need_space = true
+                else
+                    this.w.need_space = false
+                end
             end
             # Lambda body: { stmts } or -> expr
             if !matched && root == "lambda-body"
@@ -508,7 +513,6 @@ class format_visitor
     function visit_if_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("if")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         # eol (was endl token)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
@@ -531,7 +535,6 @@ class format_visitor
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "if"
             this.w.space()
             ++idx; this.w.keyword("if")
-            this.w.space()
             this.visit_children(nodes[idx++].nodes)
         end
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
@@ -542,7 +545,6 @@ class format_visitor
     function visit_while_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("while")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
             this.visit_eol(nodes[idx++].nodes)
@@ -575,7 +577,6 @@ class format_visitor
     function visit_until_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("until")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
             this.visit_eol(nodes[idx++].nodes)
@@ -585,7 +586,6 @@ class format_visitor
     function visit_for_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("for")
-        this.w.space()
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-def"
             this.visit_children(nodes[idx++].nodes)
         end
@@ -617,14 +617,12 @@ class format_visitor
     function visit_foreach_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("foreach")
-        this.w.space()
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
             this.w.write(nodes[idx++].data)
             this.w.space()
         end
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "in"
             ++idx; this.w.keyword("in")
-            this.w.space()
         end
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "basic-expr"
             this.visit_children(nodes[idx++].nodes)
@@ -638,7 +636,6 @@ class format_visitor
         var idx = 0
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "do"
             ++idx; this.w.keyword("do")
-            this.w.space()
             this.visit_children(nodes[idx++].nodes)
             this.visit_endline(nodes[idx++].nodes)
         end
@@ -655,7 +652,6 @@ class format_visitor
     function visit_switch_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("switch")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
             this.visit_eol(nodes[idx++].nodes)
@@ -689,7 +685,6 @@ class format_visitor
     function visit_switch_case(nodes)
         var idx = 0
         ++idx; this.w.keyword("case")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
             this.visit_eol(nodes[idx++].nodes)
@@ -734,7 +729,6 @@ class format_visitor
     function visit_catch_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("catch")
-        this.w.space()
         this.w.write(nodes[idx++].data)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ":"
             this.w.write(nodes[idx++].data)
@@ -765,10 +759,8 @@ class format_visitor
         var idx = 0
         if is_async
             ++idx; this.w.keyword("async")
-            this.w.space()
         end
         ++idx; this.w.keyword("function")
-        this.w.space()
         this.w.write(nodes[idx++].data)
         ++idx; this.w.write("(")
         # skip nl, handle argument-list, skip nl
@@ -835,12 +827,10 @@ class format_visitor
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
             this.w.keyword(nodes[idx++].data)
         end
-        this.w.space()
         this.w.write(nodes[idx++].data)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "extends"
             this.w.space()
             ++idx; this.w.keyword("extends")
-            this.w.space()
             this.visit_children(nodes[idx++].nodes)
         end
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
@@ -856,7 +846,6 @@ class format_visitor
     function visit_namespace_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("namespace")
-        this.w.space()
         this.w.write(nodes[idx++].data)
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
             this.visit_eol(nodes[idx++].nodes)
@@ -873,7 +862,6 @@ class format_visitor
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
             this.w.keyword(nodes[idx++].data)
         end
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         this.visit_endline(nodes[idx++].nodes)
     end
@@ -927,7 +915,6 @@ class format_visitor
     function visit_import_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("import")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         this.visit_endline(nodes[idx++].nodes)
     end
@@ -935,7 +922,6 @@ class format_visitor
     function visit_package_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("package")
-        this.w.space()
         this.w.write(nodes[idx++].data)
         this.visit_endline(nodes[idx++].nodes)
     end
@@ -943,7 +929,6 @@ class format_visitor
     function visit_using_stmt(nodes)
         var idx = 0
         ++idx; this.w.keyword("using")
-        this.w.space()
         this.visit_children(nodes[idx++].nodes)
         this.visit_endline(nodes[idx++].nodes)
     end

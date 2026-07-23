@@ -212,7 +212,7 @@ function rule_class_naming(ctx, nodes)
 end
 
 function check_empty_stmts(ctx, node, first_pos, keyword_name)
-    if node.root == "stmts" || node.root == "decl-stmts"
+    if node.root == "stmts"
         var has_stmt = false
         for j = 0, j < node.nodes.size, ++j
             if typeid node.nodes[j] == typeid parsergen.syntax_tree && node.nodes[j].root == "statement"
@@ -224,9 +224,22 @@ function check_empty_stmts(ctx, node, first_pos, keyword_name)
             ctx.add_issue(first_pos, "Empty " + keyword_name + " block body.", SEVERITY_WARNING, "empty_block")
         end
     else
-        for j = 0, j < node.nodes.size, ++j
-            if typeid node.nodes[j] == typeid parsergen.syntax_tree
-                check_empty_stmts(ctx, node.nodes[j], first_pos, keyword_name)
+        if node.root == "decl-stmts"
+            var has_decl = false
+            for j = 0, j < node.nodes.size, ++j
+                if typeid node.nodes[j] == typeid parsergen.syntax_tree && node.nodes[j].root == "declaration"
+                    has_decl = true
+                    break
+                end
+            end
+            if !has_decl
+                ctx.add_issue(first_pos, "Empty " + keyword_name + " block body.", SEVERITY_WARNING, "empty_block")
+            end
+        else
+            for j = 0, j < node.nodes.size, ++j
+                if typeid node.nodes[j] == typeid parsergen.syntax_tree
+                    check_empty_stmts(ctx, node.nodes[j], first_pos, keyword_name)
+                end
             end
         end
     end
@@ -575,6 +588,7 @@ class linter
 
     function visit_class_stmt(nodes)
         rule_class_naming(this.ctx, nodes)
+        rule_empty_block(this.ctx, nodes)
         for i = 0, i < nodes.size, ++i
             if typeid nodes[i] == typeid parsergen.syntax_tree
                 if nodes[i].root == "decl-stmts"
