@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.1.0 Cuon alpinus(Stable) Build 2"
+    constant version = "4.1.0 Cuon alpinus(Stable) Build 3"
     constant std_version = "260702"
     constant min_runtime = "260702"
 end

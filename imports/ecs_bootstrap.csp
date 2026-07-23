@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.7.0
+# Bootstrap of Extended Covariant Script Generator v1.7.1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ package ecs_bootstrap
 import parsergen, ecs_parser, ecs_generator, ecs_lint, ecs_format, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.7.0"
+var wrapper_ver = "1.7.1"
 var exit_code = -1  # -1: continue, 0: success, >0: error
 
 function show_version_simple()
