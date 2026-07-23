@@ -112,15 +112,15 @@ assert_ge(empty_block_count, 1, "detects empty_block warnings")
 assert_ge(trailing_whitespace_count, 1, "detects trailing_whitespace warnings")
 assert_ge(consecutive_blank_lines_count, 1, "detects consecutive_blank_lines info")
 assert_eq(indentation_count, 0, "no indentation_consistency issues in test file")
-assert_eq(useless_expression_count, 0, "useless_expression rule not yet implemented")
+assert_ge(useless_expression_count, 1, "detects useless_expression warnings")
 
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_ERROR), error_count, "count_by_severity(error) matches")
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_WARNING), warning_count, "count_by_severity(warning) matches")
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_INFO), info_count, "count_by_severity(info) matches")
 
 assert_ge(error_count, 1, "has at least one severity_error")
-assert_ge(warning_count, 5, "has at least five severity_warning")
-assert_ge(issues.size, 6, "total issues >= 6")
+assert_ge(warning_count, 6, "has at least six severity_warning")
+assert_ge(issues.size, 7, "total issues >= 7")
 
 system.out.println("")
 system.out.println("Test: lint rules  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")

@@ -20,7 +20,7 @@
 
 package ecs_lint
 
-import parsergen, ecs_parser, regex
+import parsergen, ecs_parser
 
 # ============================================================
 #  Severity Levels
@@ -157,14 +157,33 @@ end
 
 function check_var_names(ctx, def_nodes, is_constant)
     var didx = 0
-    # var-def is either var-bind = expr OR var-list
     if didx < def_nodes.size && typeid def_nodes[didx] == typeid parsergen.syntax_tree
         if def_nodes[didx].root == "var-bind"
-            # Skip bind patterns for now — too complex to check naming
+            check_var_bind(ctx, def_nodes[didx].nodes, is_constant)
             return
         end
         if def_nodes[didx].root == "var-list"
             check_var_list(ctx, def_nodes[didx].nodes, is_constant)
+        end
+    end
+end
+
+function check_var_bind(ctx, nodes, is_constant)
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.token_type && nodes[i].type == "id"
+            var name = nodes[i].data
+            if is_constant
+                if !is_upper_snake_case(name)
+                    ctx.add_issue(nodes[i].pos, "Constant name '" + name + "' should be UPPER_SNAKE_CASE.", SEVERITY_WARNING, "constant_naming")
+                end
+            else
+                if !is_snake_case(name)
+                    ctx.add_issue(nodes[i].pos, "Variable name '" + name + "' should be snake_case.", SEVERITY_WARNING, "variable_naming")
+                end
+            end
+        end
+        if typeid nodes[i] == typeid parsergen.syntax_tree
+            check_var_bind(ctx, nodes[i].nodes, is_constant)
         end
     end
 end
@@ -253,7 +272,7 @@ function rule_empty_block(ctx, nodes)
             if first_pos[1] == 0
                 first_pos = nodes[i].pos
             end
-            if keyword_name == "block" && nodes[i].data != "endl"
+            if keyword_name == "block" && nodes[i].data != "endl" && nodes[i].data != "async"
                 keyword_name = nodes[i].data
             end
         end
@@ -283,6 +302,56 @@ function rule_unreachable_code(ctx, nodes)
                 end
             end
         end
+    end
+end
+
+function is_side_effect_free(nodes)
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.syntax_tree
+            var root = nodes[i].root
+            if root == "fcall" || root == "index"
+                return false
+            end
+            if root == "asi-op"
+                return false
+            end
+            if root == "unary-op"
+                if !nodes[i].nodes.empty()
+                    var op = nodes[i].nodes[0].data
+                    if op == "++" || op == "--"
+                        return false
+                    end
+                end
+            end
+            if root == "postfix-expr"
+                if !nodes[i].nodes.empty()
+                    var pf = nodes[i].nodes[0].data
+                    if pf == "++" || pf == "--"
+                        return false
+                    end
+                end
+            end
+            if !is_side_effect_free(nodes[i].nodes)
+                return false
+            end
+        end
+        if typeid nodes[i] == typeid parsergen.token_type
+            var data = nodes[i].data
+            if data == "new" || data == "gcnew"
+                return false
+            end
+        end
+    end
+    return true
+end
+
+function rule_useless_expression(ctx, nodes)
+    if nodes.empty()
+        return
+    end
+    if is_side_effect_free(nodes)
+        var pos = get_pos(nodes)
+        ctx.add_issue(pos, "Useless expression with no side effect.", SEVERITY_WARNING, "useless_expression")
     end
 end
 
@@ -321,13 +390,13 @@ function rule_consecutive_blank_lines(ctx)
             ++blank_count
         else
             if blank_count > 2
-                ctx.add_issue({1, i - blank_count + 2}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
+                ctx.add_issue({1, i - blank_count}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
             end
             blank_count = 0
         end
     end
     if blank_count > 2
-        ctx.add_issue({1, ctx.code_buff.size - blank_count + 2}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
+        ctx.add_issue({1, ctx.code_buff.size - blank_count}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
     end
 end
 
@@ -711,6 +780,7 @@ class linter
     end
 
     function visit_expr_stmt(nodes)
+        rule_useless_expression(this.ctx, nodes)
         this.visit_node(nodes)
     end
 end

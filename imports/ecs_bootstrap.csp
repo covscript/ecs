@@ -155,9 +155,9 @@ function show_help()
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
-        "   -l            Lint check\n" +
-        "   -F            Format source file\n" +
-        "   -n            Dry-run format (print to stdout)\n" +
+        "   -l            Lint check (requires file argument)\n" +
+        "   -F            Format source file in-place\n" +
+        "   -n            Dry-run format to stdout (implies -F)\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
         "   -o <PATH>     Set output path\n" +
@@ -191,6 +191,7 @@ var silent = false
 var splash = null
 var output = null
 var csym = false
+var explicit_csym = false
 var repl = false
 var lint_only = false
 var format_only = false
@@ -240,6 +241,7 @@ function process_args(cmd_args)
             case "-g"
                 no_hash = true
                 csym = true
+                explicit_csym = true
             end
             case "-d"
                 executor = "cs_dbg -s "
@@ -402,6 +404,7 @@ function run_ecs(cmd_args)
     splash = null
     output = null
     csym = false
+    explicit_csym = false
     repl = false
     lint_only = false
     format_only = false
@@ -416,9 +419,27 @@ function run_ecs(cmd_args)
     if format_dry_run
         format_only = true
     end
+    if lint_only && format_only
+        system.out.println("Warning: -l and -F are mutually exclusive; lint mode takes precedence.")
+        format_only = false
+        format_dry_run = false
+    end
     if lint_only || format_only
         no_run = true
         no_hash = true
+        if output != null
+            system.out.println("Warning: -o is ignored in lint/format mode.")
+        end
+        if executor != "cs "
+            system.out.println("Warning: -d is ignored in lint/format mode.")
+        end
+        if explicit_csym
+            system.out.println("Warning: -g is ignored in lint/format mode.")
+        end
+    end
+    if repl && (lint_only || format_only)
+        system.out.println("Error: -l/-F is incompatible with REPL mode.")
+        return 1
     end
     if repl
         var instance = new repl_instance
