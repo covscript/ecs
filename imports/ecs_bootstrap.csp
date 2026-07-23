@@ -229,8 +229,6 @@ function process_args(cmd_args)
                 no_run = true
             end
             case "-n"
-                format_only = true
-                no_run = true
                 format_dry_run = true
             end
             case "-s"
@@ -411,6 +409,14 @@ function run_ecs(cmd_args)
     process_args(cmd_args)
     if exit_code != -1
         return exit_code
+    end
+    # -n implies format + dry-run; lint/format modes skip the compile cache
+    if format_dry_run
+        format_only = true
+    end
+    if lint_only || format_only
+        no_run = true
+        no_hash = true
     end
     if repl
         var instance = new repl_instance

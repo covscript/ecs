@@ -111,6 +111,8 @@ assert_ge(unreachable_code_count, 1, "detects unreachable_code errors")
 assert_ge(empty_block_count, 1, "detects empty_block warnings")
 assert_ge(trailing_whitespace_count, 1, "detects trailing_whitespace warnings")
 assert_ge(consecutive_blank_lines_count, 1, "detects consecutive_blank_lines info")
+assert_eq(indentation_count, 0, "no indentation_consistency issues in test file")
+assert_eq(useless_expression_count, 0, "useless_expression rule not yet implemented")
 
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_ERROR), error_count, "count_by_severity(error) matches")
 assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_WARNING), warning_count, "count_by_severity(warning) matches")

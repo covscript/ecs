@@ -119,7 +119,9 @@ class format_writer
     end
 
     function pop_indent()
-        --indent_level
+        if indent_level > 0
+            --indent_level
+        end
     end
 
     function token(tok)
@@ -635,7 +637,7 @@ class format_visitor
     function visit_for_body(nodes)
         var idx = 0
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "do"
-            ++idx; this.w.write("do")
+            ++idx; this.w.keyword("do")
             this.w.space()
             this.visit_children(nodes[idx++].nodes)
             this.visit_endline(nodes[idx++].nodes)
@@ -817,6 +819,7 @@ class format_visitor
         var idx = 0
         if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
             ++idx; this.w.write("{")
+            this.w.space()
             this.visit_stmts(nodes[idx++].nodes)
             ++idx; this.w.write("}")
         end
