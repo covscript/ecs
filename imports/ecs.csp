@@ -1,4 +1,4 @@
-# Extended Covariant Script Header: v1.4.0
+# Extended Covariant Script Header: v1.4.2
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,6 +27,12 @@ package ecs
 #  Type System
 # ============================================================
 
+struct lambda_base
+    # This is an empty base struct used to identify lambda objects
+    # in the CovScript type system. It serves as a marker for lambda
+    # functions and allows for type checking and validation of lambda
+    # objects within the ECS framework.
+end
 
 namespace type_validator
     function __type(obj)
@@ -43,7 +49,11 @@ namespace type_validator
     end
     function __function(obj)
         link real_type = sdk.typeids.get_real(obj)
-        return real_type == sdk.typeids.callable || real_type == sdk.typeids.memberfn
+        if real_type == sdk.typeids.callable || real_type == sdk.typeids.memberfn
+            return true
+        else
+            return global.is_a(typeid obj, typeid lambda_base)
+        end
     end
     function __exception(obj)
         return sdk.typeids.get_real(obj) == sdk.typeids.exception

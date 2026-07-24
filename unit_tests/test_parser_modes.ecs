@@ -1,0 +1,88 @@
+# Unit tests: Parser strict/non-strict mode coverage
+import ecs
+import ecs_parser, parsergen, regex
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function key_exists(map, key)
+    try
+        var val = map.at(key)
+        return true
+    catch e
+        return false
+    end
+end
+
+# === Lexical returns valid hash_maps ===
+var lex_ns = ecs_parser.get_lexical(regex.build_optimize, false)
+assert(typeid lex_ns == typeid hash_map, "non-strict lex is hash_map")
+
+var lex_s = ecs_parser.get_lexical(regex.build_optimize, true)
+assert(typeid lex_s == typeid hash_map, "strict lex is hash_map")
+
+# Non-strict: "ign" must exist, "com" must not
+assert(key_exists(lex_ns, "ign"), "non-strict lex has 'ign'")
+assert(!key_exists(lex_ns, "com"), "non-strict lex does not have 'com'")
+
+# Strict: both "ign" and "com" must exist
+assert(key_exists(lex_s, "ign"), "strict lex has 'ign'")
+assert(key_exists(lex_s, "com"), "strict lex has 'com'")
+
+# === Syntax returns valid hash_maps ===
+var stx_ns = ecs_parser.get_syntax(false)
+assert(typeid stx_ns == typeid hash_map, "non-strict stx is hash_map")
+
+var stx_s = ecs_parser.get_syntax(true)
+assert(typeid stx_s == typeid hash_map, "strict stx is hash_map")
+
+# Non-strict: must have "ignore" and main rules
+assert(key_exists(stx_ns, "ignore"), "non-strict stx has 'ignore'")
+assert(key_exists(stx_ns, "begin"), "non-strict stx has 'begin'")
+assert(key_exists(stx_ns, "stmts"), "non-strict stx has 'stmts'")
+assert(key_exists(stx_ns, "statement"), "non-strict stx has 'statement'")
+
+# Strict: must have "nl", "eol", "eos" and main rules
+assert(key_exists(stx_s, "nl"), "strict stx has 'nl'")
+assert(key_exists(stx_s, "eol"), "strict stx has 'eol'")
+assert(key_exists(stx_s, "eos"), "strict stx has 'eos'")
+assert(key_exists(stx_s, "begin"), "strict stx has 'begin'")
+assert(key_exists(stx_s, "stmts"), "strict stx has 'stmts'")
+
+# === Parse with non-strict grammar (default) ===
+var grammar_ns = new parsergen.grammar
+grammar_ns.ext = ".*\\.(csp|csc|ecs|ecsx)"
+grammar_ns.lex = ecs_parser.get_lexical(regex.build_optimize, false)
+grammar_ns.stx := ecs_parser.get_syntax(false)
+
+var parser_ns = new parsergen.generator
+parser_ns.add_grammar("ecs-lang-ns", grammar_ns)
+parser_ns.from_file("unit_tests/test_functions.ecs")
+assert(parser_ns.ast != null, "non-strict mode parses test_functions.ecs")
+
+# === Parse with strict grammar ===
+var grammar_s = new parsergen.grammar
+grammar_s.ext = ".*\\.(csp|csc|ecs|ecsx)"
+grammar_s.lex = ecs_parser.get_lexical(regex.build_optimize, true)
+grammar_s.stx := ecs_parser.get_syntax(true)
+
+var parser_s = new parsergen.generator
+parser_s.add_grammar("ecs-lang-s", grammar_s)
+parser_s.from_file("unit_tests/test_functions.ecs")
+assert(parser_s.ast != null, "strict mode parses test_functions.ecs")
+
+# === results ===
+system.out.println("")
+system.out.println("Test: parser modes  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

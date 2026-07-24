@@ -1,0 +1,1424 @@
+# ECS Formatter v1.0.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Copyright (C) 2017-2026 Michael Lee(李登淳)
+#
+# Email:   mikecovlee@163.com
+# Github:  https://github.com/mikecovlee
+# Website: http://covscript.org.cn
+
+package ecs_format
+
+import parsergen, ecs_parser, regex
+
+function get_fmt_grammar()
+    var g = new parsergen.grammar
+    g.ext = ".*\\.(csp|csc|ecs|ecsx)"
+    g.lex = ecs_parser.get_lexical(regex.build_optimize, true)
+    g.stx := ecs_parser.get_syntax(true)
+    return g
+end
+
+# ============================================================
+#  Format Writer
+# ============================================================
+
+class format_writer
+    var output = ""
+    var indent_size = 4
+    var indent_level = 0
+    var need_space = false
+    var last_text = ""
+    var force_space = false
+    var max_width = 120
+    var continuation = 0
+
+    var line_buf = new array
+    var break_points = new array
+    var line_width = 0
+
+    function is_ident(text)
+        if text.empty()
+            return false
+        end
+        var c = to_integer(text[0])
+        return (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c == 95 || (c >= 13312 && c <= 40959) || (c >= 63744 && c <= 64255)
+    end
+
+    function write(text)
+        if need_space || force_space
+            var suppress = false
+            if !force_space
+                if text == "," || text == ";" || text == "." || text == "->" || text == "::" || text == ")" || text == "]" || text == "}"
+                    suppress = true
+                end
+                if !suppress && (text == "(" || text == "[")
+                    if last_text == ")" || last_text == "]"
+                        suppress = true
+                    else
+                        if this.is_ident(last_text)
+                            suppress = true
+                        end
+                    end
+                end
+            end
+            if !suppress
+                line_buf.push_back(" ")
+                line_width += 1
+            end
+            need_space = false
+            force_space = false
+        end
+        line_buf.push_back(text)
+        line_width += text.size
+        last_text = text
+        if text == "(" || text == "[" || text == "{" || text == "." || text == "->" || text == "::" || text == "!"
+            need_space = false
+        else
+            need_space = true
+        end
+    end
+
+    function mark_break()
+        if !line_buf.empty()
+            break_points.push_back(line_buf.size - 1)
+        end
+    end
+
+    function newline()
+        this.flush_line()
+        output += '\n'
+        need_space = false
+        force_space = false
+        last_text = ""
+    end
+
+    function flush_line()
+        if line_buf.empty()
+            return
+        end
+        var indent_str = ""
+        for i = 0, i < (indent_level + continuation) * indent_size, ++i
+            indent_str += ' '
+        end
+        continuation = 0
+        var cont_indent_str = ""
+        for i = 0, i < (indent_level + 1) * indent_size, ++i
+            cont_indent_str += ' '
+        end
+        var available = max_width - indent_str.size
+        if available < 0
+            available = 0
+        end
+
+        var buf = line_buf
+        var bps = break_points
+        line_buf = new array
+        break_points = new array
+        line_width = 0
+
+        output += indent_str
+
+        var first = true
+        while !buf.empty()
+            var w = 0
+            for i = 0, i < buf.size, ++i
+                w += buf[i].size
+            end
+
+            if w <= available
+                for i = 0, i < buf.size, ++i
+                    output += buf[i]
+                end
+                break
+            end
+
+            var bp = -1
+            for i = bps.size - 1, i >= 0, --i
+                var bw = 0
+                for j = 0, j <= bps[i], ++j
+                    bw += buf[j].size
+                end
+                if bw <= available
+                    bp = bps[i]
+                    break
+                end
+            end
+
+            if bp < 0
+                for i = 0, i < buf.size, ++i
+                    output += buf[i]
+                end
+                break
+            end
+
+            for j = 0, j <= bp, ++j
+                output += buf[j]
+            end
+
+            var rest = new array
+            var start = bp + 1
+            while start < buf.size && buf[start] == " "
+                ++start
+            end
+            for j = start, j < buf.size, ++j
+                rest.push_back(buf[j])
+            end
+
+            if rest.empty()
+                break
+            end
+
+            output += '\n'
+            if first
+                available = max_width - cont_indent_str.size
+                if available < 0
+                    available = 0
+                end
+            end
+            output += cont_indent_str
+
+            first = false
+            buf = rest
+            var new_bps = new array
+            for i = 0, i < bps.size, ++i
+                if bps[i] > bp
+                    new_bps.push_back(bps[i] - bp - 1)
+                end
+            end
+            bps = new_bps
+        end
+    end
+
+    function space()
+        need_space = true
+    end
+
+    function push_indent()
+        ++indent_level
+    end
+
+    function pop_indent()
+        if indent_level > 0
+            --indent_level
+        end
+    end
+
+    function token(tok)
+        if tok.type == "endl" || tok.type == "com"
+            return
+        end
+        this.write(tok.data)
+    end
+
+    function keyword(kw)
+        this.write(kw)
+        this.force_space = true
+    end
+end
+
+# ============================================================
+#  Format Visitor
+# ============================================================
+
+class format_visitor
+    var w = null
+    var skip_next_eos = false
+
+    function run(file_name, code_buff, ast)
+        this.w = new format_writer
+        this.visit_begin(ast.nodes)
+        this.w.flush_line()
+        return this.w.output
+    end
+
+    # === Generic walker for expression children ===
+
+    function visit_children(nodes)
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.type == "com"
+                    this.w.write(node.data)
+                    this.w.newline()
+                else
+                    if node.type != "endl"
+                        this.w.token(node)
+                        if node.data == "," || node.data == "+" || node.data == "-" || node.data == "*" || node.data == "/" || node.data == "%" || node.data == "^" || node.data == "=" || node.data == "+=" || node.data == "-=" || node.data == "*=" || node.data == "/=" || node.data == "%=" || node.data == "==" || node.data == "!=" || node.data == "<" || node.data == ">" || node.data == "<=" || node.data == ">=" || node.data == "&&" || node.data == "||"
+                            this.w.mark_break()
+                        end
+                    end
+                end
+            end
+            if typeid node == typeid parsergen.syntax_tree
+                this.dispatch(node)
+            end
+        end
+    end
+
+    function dispatch(node)
+        var root = node.root
+        block
+            var matched = false
+            if !matched && root == "begin"
+                matched = true
+                this.visit_begin(node.nodes)
+            end
+            if !matched && root == "stmts"
+                matched = true
+                this.visit_stmts(node.nodes)
+            end
+            if !matched && root == "decl-stmts"
+                matched = true
+                this.visit_decl_stmts(node.nodes)
+            end
+            if !matched && root == "statement"
+                matched = true
+                this.visit_statement(node.nodes)
+            end
+            if !matched && root == "declaration"
+                matched = true
+                this.visit_declaration(node.nodes)
+            end
+            if !matched && root == "if-stmt"
+                matched = true
+                this.visit_if_stmt(node.nodes)
+            end
+            if !matched && root == "while-stmt"
+                matched = true
+                this.visit_while_stmt(node.nodes)
+            end
+            if !matched && root == "loop-stmt"
+                matched = true
+                this.visit_loop_stmt(node.nodes)
+            end
+            if !matched && root == "for-stmt"
+                matched = true
+                this.visit_for_stmt(node.nodes)
+            end
+            if !matched && root == "foreach-stmt"
+                matched = true
+                this.visit_foreach_stmt(node.nodes)
+            end
+            if !matched && root == "switch-stmt"
+                matched = true
+                this.visit_switch_stmt(node.nodes)
+            end
+            if !matched && root == "try-stmt"
+                matched = true
+                this.visit_try_stmt(node.nodes)
+            end
+            if !matched && root == "block-stmt"
+                matched = true
+                this.visit_block_stmt(node.nodes)
+            end
+            if !matched && root == "function-stmt"
+                matched = true
+                this.visit_function_stmt(node.nodes)
+            end
+            if !matched && root == "async-function-stmt"
+                matched = true
+                this.visit_async_function_stmt(node.nodes)
+            end
+            if !matched && root == "class-stmt"
+                matched = true
+                this.visit_class_stmt(node.nodes)
+            end
+            if !matched && root == "namespace-stmt"
+                matched = true
+                this.visit_namespace_stmt(node.nodes)
+            end
+            if !matched && root == "var-stmt"
+                matched = true
+                this.visit_var_stmt(node.nodes)
+            end
+            if !matched && root == "return-stmt"
+                matched = true
+                this.visit_return_stmt(node.nodes)
+            end
+            if !matched && root == "throw-stmt"
+                matched = true
+                this.visit_throw_stmt(node.nodes)
+            end
+            if !matched && root == "yield-stmt"
+                matched = true
+                this.visit_yield_stmt(node.nodes)
+            end
+            if !matched && root == "control-stmt"
+                matched = true
+                this.visit_control_stmt(node.nodes)
+            end
+            if !matched && root == "expr-stmt"
+                matched = true
+                this.visit_expr_stmt(node.nodes)
+            end
+            if !matched && root == "import-stmt"
+                matched = true
+                this.visit_import_stmt(node.nodes)
+            end
+            if !matched && root == "package-stmt"
+                matched = true
+                this.visit_package_stmt(node.nodes)
+            end
+            if !matched && root == "using-stmt"
+                matched = true
+                this.visit_using_stmt(node.nodes)
+            end
+            if !matched && root == "prep-stmt"
+                matched = true
+                this.visit_prep_stmt(node.nodes)
+            end
+            if !matched && root == "function-body"
+                matched = true
+                this.visit_function_body(node.nodes)
+            end
+            if !matched && root == "for-body"
+                matched = true
+                this.visit_for_body(node.nodes)
+            end
+            if !matched && root == "endline"
+                matched = true
+                this.visit_endline(node.nodes)
+            end
+            if !matched && root == "else-stmt"
+                matched = true
+                this.visit_else_stmt(node.nodes)
+            end
+            if !matched && root == "catch-stmt"
+                matched = true
+                this.visit_catch_stmt(node.nodes)
+            end
+            if !matched && root == "switch-case"
+                matched = true
+                this.visit_switch_case(node.nodes)
+            end
+            if !matched && root == "switch-default"
+                matched = true
+                this.visit_switch_default(node.nodes)
+            end
+            if !matched && root == "switch-stmts"
+                matched = true
+                this.visit_switch_stmts(node.nodes)
+            end
+            if !matched && root == "until-stmt"
+                matched = true
+                this.visit_until_stmt(node.nodes)
+            end
+            # Format-grammar helpers: eol = optional inline comment + newline
+            if !matched && root == "eol"
+                matched = true
+                this.visit_eol(node.nodes)
+            end
+            # Format-grammar helpers: eos = newline or standalone comment
+            if !matched && root == "eos"
+                matched = true
+                this.visit_eos(node.nodes)
+            end
+            if !matched && root == "nl"
+                matched = true
+                this.visit_nl(node.nodes)
+            end
+            if !matched && root == "array"
+                matched = true
+                this.visit_array(node.nodes)
+            end
+            if !matched && root == "fcall"
+                matched = true
+                this.visit_fcall(node.nodes)
+            end
+            if !matched && root == "lambda-expr"
+                matched = true
+                this.visit_lambda_expr(node.nodes)
+            end
+            if !matched && root == "async-lambda-expr"
+                matched = true
+                this.visit_async_lambda_expr(node.nodes)
+            end
+            if !matched && root == "var-bind"
+                matched = true
+                this.visit_var_bind(node.nodes)
+            end
+            if !matched && root == "bind-expr"
+                matched = true
+                this.visit_bind_expr(node.nodes)
+            end
+            if !matched && root == "cond-postfix"
+                matched = true
+                this.visit_cond_postfix(node.nodes)
+            end
+            if !matched && root == "element"
+                matched = true
+                this.visit_element(node.nodes)
+            end
+            if !matched && root == "ecsx-extend"
+                matched = true
+                this.visit_ecsx_extend(node.nodes)
+            end
+            # Unary operators: no space between operator and operand
+            if !matched && root == "unary-op"
+                matched = true
+                var op = node.nodes[0].data
+                this.w.write(op)
+                if op == "typeid" || op == "not"
+                    this.w.need_space = true
+                else
+                    this.w.need_space = false
+                end
+            end
+            # Postfix operators: no space before ++/--/...
+            if !matched && root == "postfix-expr"
+                matched = true
+                this.w.need_space = false
+                this.visit_children(node.nodes)
+            end
+            # Lambda body: { stmts } or -> expr
+            if !matched && root == "lambda-body"
+                matched = true
+                this.visit_lambda_body(node.nodes)
+            end
+            if !matched
+                this.visit_children(node.nodes)
+            end
+        end
+    end
+
+    # === Comment-aware line-end handlers ===
+
+    function visit_eol(nodes)
+        # eol = optional(com) + endl
+        # Inline comment (if present) before the newline
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.type == "com"
+                    this.w.space()
+                    this.w.write(node.data)
+                end
+                if node.type == "endl"
+                    this.w.newline()
+                end
+            end
+        end
+    end
+
+    function visit_eos(nodes)
+        # eos = com + endl (standalone comment line) | endl (blank line)
+        if nodes.size >= 2 && typeid nodes[0] == typeid parsergen.token_type && nodes[0].type == "com"
+            # Standalone comment line
+            this.w.write(nodes[0].data)
+            this.w.newline()
+        else
+            # Blank line
+            this.w.newline()
+        end
+    end
+
+    function visit_nl(nodes)
+        if nodes.size > 0
+            this.w.newline()
+            this.w.continuation = 1
+        end
+    end
+
+    # === Top-level ===
+
+    function visit_begin(nodes)
+        if nodes.empty()
+            return
+        end
+        for idx = 0, idx < nodes[0].nodes.size, ++idx
+            var node = nodes[0].nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                if node.root == "statement"
+                    this.visit_statement(node.nodes)
+                end
+                if node.root == "eos"
+                    if this.skip_next_eos && node.nodes.size == 1
+                        this.skip_next_eos = false
+                    else
+                        this.skip_next_eos = false
+                        this.visit_eos(node.nodes)
+                    end
+                end
+                if node.root == "eol"
+                    this.visit_eol(node.nodes)
+                end
+            end
+            if typeid node == typeid parsergen.token_type
+                if node.type == "com"
+                    this.w.write(node.data)
+                    this.w.newline()
+                end
+            end
+        end
+    end
+
+    function visit_stmts(nodes)
+        this.w.push_indent()
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                if node.root == "statement"
+                    this.visit_statement(node.nodes)
+                end
+                if node.root == "eos"
+                    if this.skip_next_eos && node.nodes.size == 1
+                        this.skip_next_eos = false
+                    else
+                        this.skip_next_eos = false
+                        this.visit_eos(node.nodes)
+                    end
+                end
+                if node.root == "eol"
+                    this.visit_eol(node.nodes)
+                end
+            end
+            if typeid node == typeid parsergen.token_type
+                if node.type == "com"
+                    this.w.write(node.data)
+                    this.w.newline()
+                end
+            end
+        end
+        this.w.pop_indent()
+    end
+
+    function visit_decl_stmts(nodes)
+        this.w.push_indent()
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                if node.root == "declaration"
+                    this.visit_declaration(node.nodes)
+                end
+                if node.root == "eos"
+                    if this.skip_next_eos && node.nodes.size == 1
+                        this.skip_next_eos = false
+                    else
+                        this.skip_next_eos = false
+                        this.visit_eos(node.nodes)
+                    end
+                end
+                if node.root == "eol"
+                    this.visit_eol(node.nodes)
+                end
+            end
+            if typeid node == typeid parsergen.token_type
+                if node.type == "com"
+                    this.w.write(node.data)
+                    this.w.newline()
+                end
+            end
+        end
+        this.w.pop_indent()
+    end
+
+    function visit_statement(nodes)
+        if nodes.empty()
+            return
+        end
+        var node = nodes[0]
+        if typeid node == typeid parsergen.syntax_tree
+            this.dispatch(node)
+        end
+    end
+
+    function visit_declaration(nodes)
+        if nodes.empty()
+            return
+        end
+        var node = nodes[0]
+        if typeid node == typeid parsergen.syntax_tree
+            this.dispatch(node)
+        end
+    end
+
+    function visit_array(nodes)
+        var idx = 0
+        if idx >= nodes.size
+            return
+        end
+        if typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+        var multiline = false
+        for i = idx, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "nl" && nodes[i].nodes.size > 0
+                multiline = true
+                break
+            end
+        end
+        if multiline
+            this.w.newline()
+            this.w.push_indent()
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+        end
+        while idx < nodes.size
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.data == "}" || node.data == "]"
+                    break
+                end
+                this.w.token(node)
+                ++idx
+            else
+                if typeid node == typeid parsergen.syntax_tree
+                    if node.root == "nl"
+                        if multiline
+                            this.w.newline()
+                        end
+                        ++idx
+                    else
+                        this.dispatch(node)
+                        this.w.continuation = 0
+                        ++idx
+                    end
+                end
+            end
+        end
+        if multiline
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+            this.w.pop_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+    end
+
+    function visit_fcall(nodes)
+        var idx = 0
+        if idx >= nodes.size
+            return
+        end
+        if typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+        var multiline = false
+        for i = idx, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "nl" && nodes[i].nodes.size > 0
+                multiline = true
+                break
+            end
+        end
+        if multiline
+            this.w.newline()
+            this.w.push_indent()
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+        end
+        while idx < nodes.size
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.data == ")"
+                    break
+                end
+                this.w.token(node)
+                ++idx
+            else
+                if typeid node == typeid parsergen.syntax_tree
+                    if node.root == "nl"
+                        if multiline
+                            this.w.newline()
+                        end
+                        ++idx
+                    else
+                        this.dispatch(node)
+                        ++idx
+                    end
+                end
+            end
+        end
+        if multiline
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+            this.w.pop_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+    end
+
+    function visit_endline(nodes)
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                this.skip_next_eos = false
+                this.dispatch(node)
+            end
+            if typeid node == typeid parsergen.token_type
+                if node.data == ";"
+                    this.skip_next_eos = true
+                    this.w.write(";")
+                    this.w.newline()
+                end
+            end
+        end
+    end
+
+    # === Block statements ===
+
+    function visit_if_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("if")
+        this.visit_children(nodes[idx++].nodes)
+        # eol (was endl token)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "else-stmt"
+            this.visit_else_stmt(nodes[idx++].nodes)
+            this.visit_stmts(nodes[idx++].nodes)
+        end
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_else_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("else")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "if"
+            this.w.space()
+            ++idx; this.w.keyword("if")
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_while_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("while")
+        this.visit_children(nodes[idx++].nodes)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_loop_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("loop")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "until-stmt"
+            this.visit_until_stmt(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "end"
+            ++idx; this.w.keyword("end")
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+                this.visit_eol(nodes[idx++].nodes)
+            end
+        end
+    end
+
+    function visit_until_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("until")
+        this.visit_children(nodes[idx++].nodes)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_for_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("for")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-def"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+            this.w.space()
+        end
+        # skip nl
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            ++idx
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "basic-expr"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+            this.w.space()
+        end
+        # skip nl
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            ++idx
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "basic-expr"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        this.visit_for_body(nodes[idx++].nodes)
+    end
+
+    function visit_foreach_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("foreach")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
+            this.w.write(nodes[idx++].data)
+            this.w.space()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "in"
+            ++idx; this.w.keyword("in")
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "basic-expr"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "for-body"
+            this.visit_for_body(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_for_body(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "do"
+            ++idx; this.w.keyword("do")
+            this.visit_children(nodes[idx++].nodes)
+            this.visit_endline(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+            this.visit_stmts(nodes[idx++].nodes)
+            ++idx; this.w.keyword("end")
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+                this.visit_eol(nodes[idx++].nodes)
+            end
+        end
+    end
+
+    function visit_switch_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("switch")
+        this.visit_children(nodes[idx++].nodes)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "switch-stmts"
+            this.visit_switch_stmts(nodes[idx++].nodes)
+        end
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_switch_stmts(nodes)
+        for idx = 0, idx < nodes.size, ++idx
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                if node.root == "switch-case"
+                    this.visit_switch_case(node.nodes)
+                end
+                if node.root == "switch-default"
+                    this.visit_switch_default(node.nodes)
+                end
+                if node.root == "eos"
+                    this.visit_eos(node.nodes)
+                end
+            end
+        end
+    end
+
+    function visit_switch_case(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("case")
+        this.visit_children(nodes[idx++].nodes)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_switch_default(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("default")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_try_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("try")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "catch-stmt"
+            this.visit_catch_stmt(nodes[idx++].nodes)
+            this.visit_stmts(nodes[idx++].nodes)
+        end
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_catch_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("catch")
+        this.w.write(nodes[idx++].data)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ":"
+            this.w.write(nodes[idx++].data)
+            this.w.space()
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_block_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("block")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_lambda_expr_impl(nodes, is_async)
+        var idx = 0
+        if is_async
+            ++idx; this.w.keyword("async")
+        end
+        ++idx; this.w.write("[")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "capture-list"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        ++idx; this.w.write("]")
+        ++idx; this.w.write("(")
+        var arg_multiline = false
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            if nodes[idx].nodes.size > 0
+                arg_multiline = true
+            end
+            ++idx
+        end
+        if arg_multiline
+            this.w.newline()
+            this.w.push_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "argument-list"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if arg_multiline
+            this.w.pop_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            if arg_multiline
+                this.w.newline()
+            end
+            ++idx
+        end
+        ++idx; this.w.write(")")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "lambda-body"
+            this.visit_lambda_body(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_lambda_expr(nodes)
+        this.visit_lambda_expr_impl(nodes, false)
+    end
+
+    function visit_async_lambda_expr(nodes)
+        this.visit_lambda_expr_impl(nodes, true)
+    end
+
+    function visit_parenthesized(nodes)
+        var idx = 0
+        if idx >= nodes.size
+            return
+        end
+        if typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+        var multiline = false
+        for i = idx, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "nl" && nodes[i].nodes.size > 0
+                multiline = true
+                break
+            end
+        end
+        if multiline
+            this.w.newline()
+            this.w.push_indent()
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+        end
+        while idx < nodes.size
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.data == ")"
+                    break
+                end
+                if node.data == ","
+                    this.w.write(",")
+                    this.w.mark_break()
+                    ++idx
+                else
+                    this.w.token(node)
+                    ++idx
+                end
+            else
+                if typeid node == typeid parsergen.syntax_tree
+                    if node.root == "nl"
+                        if multiline
+                            this.w.newline()
+                        end
+                        ++idx
+                    else
+                        this.dispatch(node)
+                        ++idx
+                    end
+                end
+            end
+        end
+        if multiline
+            while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+                ++idx
+            end
+            this.w.pop_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.write(nodes[idx++].data)
+        end
+    end
+
+    function visit_var_bind(nodes)
+        this.visit_parenthesized(nodes)
+    end
+
+    function visit_bind_expr(nodes)
+        this.visit_parenthesized(nodes)
+    end
+
+    function visit_cond_postfix(nodes)
+        var idx = 0
+        if idx >= nodes.size
+            return
+        end
+        var multiline = false
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "nl" && nodes[i].nodes.size > 0
+                multiline = true
+                break
+            end
+        end
+        var pushed = false
+        while idx < nodes.size
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.token_type
+                if node.data == "?" || node.data == ":"
+                    if multiline && pushed
+                        this.w.pop_indent()
+                        this.w.newline()
+                        pushed = false
+                    end
+                    this.w.write(node.data)
+                    this.w.mark_break()
+                    if multiline
+                        this.w.newline()
+                        this.w.push_indent()
+                        pushed = true
+                    end
+                    ++idx
+                end
+            else
+                if typeid node == typeid parsergen.syntax_tree
+                    if node.root == "nl"
+                        if multiline
+                            this.w.newline()
+                        end
+                        ++idx
+                    else
+                        this.dispatch(node)
+                        ++idx
+                    end
+                end
+            end
+        end
+        if pushed
+            this.w.pop_indent()
+        end
+    end
+
+    function visit_element(nodes)
+        this.visit_children(nodes)
+    end
+
+    function visit_ecsx_extend(nodes)
+        this.visit_children(nodes)
+    end
+
+    # === Declarations ===
+
+    function visit_function_stmt_impl(nodes, is_async)
+        var idx = 0
+        if is_async
+            ++idx; this.w.keyword("async")
+        end
+        ++idx; this.w.keyword("function")
+        this.w.write(nodes[idx++].data)
+        ++idx; this.w.write("(")
+        var arg_multiline = false
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            if nodes[idx].nodes.size > 0
+                arg_multiline = true
+            end
+            ++idx
+        end
+        if arg_multiline
+            this.w.newline()
+            this.w.push_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "argument-list"
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if arg_multiline
+            this.w.pop_indent()
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "nl"
+            if arg_multiline
+                this.w.newline()
+            end
+            ++idx
+        end
+        ++idx; this.w.write(")")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "override"
+            this.w.space()
+            ++idx; this.w.write("override")
+        end
+        this.visit_function_body(nodes[idx++].nodes)
+    end
+
+    function visit_function_stmt(nodes)
+        this.visit_function_stmt_impl(nodes, false)
+    end
+
+    function visit_async_function_stmt(nodes)
+        this.visit_function_stmt_impl(nodes, true)
+    end
+
+    function visit_function_body(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
+            ++idx; this.w.write("{")
+            this.w.newline()
+            this.skip_next_eos = true
+            this.visit_stmts(nodes[idx++].nodes)
+            ++idx; this.w.write("}")
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+            this.visit_stmts(nodes[idx++].nodes)
+            ++idx; this.w.keyword("end")
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+                this.visit_eol(nodes[idx++].nodes)
+            end
+        end
+    end
+
+    function visit_lambda_body(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
+            ++idx; this.w.write("{")
+            this.w.newline()
+            this.skip_next_eos = true
+            this.visit_stmts(nodes[idx++].nodes)
+            ++idx; this.w.write("}")
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "->"
+            ++idx; this.w.write("->")
+            this.w.space()
+            this.visit_children(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_class_stmt(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.keyword(nodes[idx++].data)
+        end
+        this.w.write(nodes[idx++].data)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "extends"
+            this.w.space()
+            ++idx; this.w.keyword("extends")
+            this.visit_children(nodes[idx++].nodes)
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_decl_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_namespace_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("namespace")
+        this.w.write(nodes[idx++].data)
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+        this.visit_decl_stmts(nodes[idx++].nodes)
+        ++idx; this.w.keyword("end")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "eol"
+            this.visit_eol(nodes[idx++].nodes)
+        end
+    end
+
+    function visit_var_stmt(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.keyword(nodes[idx++].data)
+        end
+        this.visit_children(nodes[idx++].nodes)
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    # === Simple statements ===
+
+    function visit_return_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("return")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root != "endline"
+            this.w.space()
+            this.visit_children(nodes[idx++].nodes)
+        end
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_throw_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("throw")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root != "endline"
+            this.w.space()
+            this.visit_children(nodes[idx++].nodes)
+        end
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_yield_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("yield")
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root != "endline"
+            this.w.space()
+            this.visit_children(nodes[idx++].nodes)
+        end
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_control_stmt(nodes)
+        var idx = 0
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+            this.w.keyword(nodes[idx++].data)
+        end
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_expr_stmt(nodes)
+        var idx = 0
+        this.visit_children(nodes[idx++].nodes)
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_import_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("import")
+        this.visit_children(nodes[idx++].nodes)
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_package_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("package")
+        this.w.write(nodes[idx++].data)
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_using_stmt(nodes)
+        var idx = 0
+        ++idx; this.w.keyword("using")
+        this.visit_children(nodes[idx++].nodes)
+        this.visit_endline(nodes[idx++].nodes)
+    end
+
+    function visit_prep_stmt(nodes)
+        for idx = 0, idx < nodes.size, ++idx
+            if typeid nodes[idx] == typeid parsergen.token_type
+                this.w.write(nodes[idx].data)
+            end
+        end
+        this.w.newline()
+    end
+end
+
+# ============================================================
+#  Public API
+# ============================================================
+
+function format_ast(file_name, code_buff, ast)
+    var vis = new format_visitor
+    return vis.run(file_name, code_buff, ast)
+end
+
+function format_file(file_name, unicode_cvt)
+    # Use format-specific grammar so comments appear as "com" tokens in AST
+    var parser = new parsergen.generator
+    if unicode_cvt != null
+        parser.unicode_cvt = unicode_cvt
+    end
+    parser.add_grammar("ecs-lang-fmt", get_fmt_grammar())
+    parser.from_file(file_name)
+    if parser.ast == null
+        system.out.println("Error: Failed to parse file '" + file_name + "'.")
+        return null
+    end
+    return format_ast(file_name, parser.code_buff, parser.ast)
+end
+
+var version = "1.0.0"

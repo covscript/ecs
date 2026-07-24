@@ -1,0 +1,13 @@
+{
+    "Type": "Package",
+    "Name": "ecs_lint",
+    "Info": "Extended CovScript(ECS Lang) Linter & Formatter",
+    "Author": "Michael Lee",
+    "Version": "1.0.0",
+    "Target": "imports/ecs_lint.csp",
+    "Dependencies": [
+        "parsergen",
+        "regex",
+        "ecs_parser"
+    ]
+}

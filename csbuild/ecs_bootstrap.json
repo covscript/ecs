@@ -3,12 +3,14 @@
     "Name": "ecs_bootstrap",
     "Info": "Extended CovScript(ECS Lang) Bootstrap",
     "Author": "Michael Lee",
-    "Version": "1.7.0",
+    "Version": "1.7.1",
     "Target": "imports/ecs_bootstrap.csp",
     "Dependencies": [
         "parsergen",
         "ecs_parser",
         "ecs_generator",
+        "ecs_lint",
+        "ecs_format",
         "sdk_extension",
         "codec",
         "regex"

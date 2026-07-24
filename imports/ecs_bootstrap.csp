@@ -1,4 +1,4 @@
-# Bootstrap of Extended Covariant Script Generator v1.7.0
+# Bootstrap of Extended Covariant Script Generator v1.7.1
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,10 +20,10 @@
 
 package ecs_bootstrap
 
-import parsergen, ecs_parser, ecs_generator, codec, regex
+import parsergen, ecs_parser, ecs_generator, ecs_lint, ecs_format, codec, regex
 import sdk_extension as sdk
 
-var wrapper_ver = "1.7.0"
+var wrapper_ver = "1.7.1"
 var exit_code = -1  # -1: continue, 0: success, >0: error
 
 function show_version_simple()
@@ -155,6 +155,9 @@ function show_help()
         "   -f            Disable compile cache\n" +
         "   -m            Disable beautify\n" +
         "   -c            Check grammar only\n" +
+        "   -l            Lint check (requires file argument)\n" +
+        "   -F            Format source file in-place\n" +
+        "   -n            Dry-run format to stdout (implies -F)\n" +
         "   -g            Generate cSYM info\n" +
         "   -d            Run debugger\n" +
         "   -o <PATH>     Set output path\n" +
@@ -188,7 +191,11 @@ var silent = false
 var splash = null
 var output = null
 var csym = false
+var explicit_csym = false
 var repl = false
+var lint_only = false
+var format_only = false
+var format_dry_run = false
 
 function process_args(cmd_args)
     var index = 1
@@ -214,17 +221,27 @@ function process_args(cmd_args)
             case "-c"
                 no_run = true
             end
+            case "-l"
+                lint_only = true
+                no_run = true
+            end
+            case "-F"
+                format_only = true
+                no_run = true
+            end
+            case "-n"
+                format_dry_run = true
+            end
             case "-s"
                 silent = true
             end
             case "-r"
                 repl = true
-                ++index
-                break
             end
             case "-g"
                 no_hash = true
                 csym = true
+                explicit_csym = true
             end
             case "-d"
                 executor = "cs_dbg -s "
@@ -254,7 +271,11 @@ function process_args(cmd_args)
                     exit_code = 1
                     return
                 end
-                csx_path = cmd_args[++index]
+                if csx_path == null
+                    csx_path = cmd_args[++index]
+                else
+                    csx_path = csx_path + system.path.delimiter + cmd_args[++index]
+                end
             end
             case "-o"
                 if index == cmd_args.size - 1
@@ -358,7 +379,7 @@ function setup_unicode(charset)
         return null
     end
     var cvt = codecvt_map.at(cvt_name)(unicode_ext)
-    ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(cvt.local2wide(str)))
+    ecs_parser.grammar.lex = ecs_parser.get_lexical([](str)->unicode_ext.build_optimize_wregex(cvt.local2wide(str)), false)
     if cvt_name == "GBK"
         var wrapper = new gbk_wrapper
         wrapper.codecvt = cvt
@@ -383,12 +404,42 @@ function run_ecs(cmd_args)
     splash = null
     output = null
     csym = false
+    explicit_csym = false
     repl = false
+    lint_only = false
+    format_only = false
+    format_dry_run = false
     exit_code = -1
 
     process_args(cmd_args)
     if exit_code != -1
         return exit_code
+    end
+    # -n implies format + dry-run; lint/format modes skip the compile cache
+    if format_dry_run
+        format_only = true
+    end
+    if lint_only && format_only
+        system.out.println("Warning: -l and -F are mutually exclusive; lint mode takes precedence.")
+        format_only = false
+        format_dry_run = false
+    end
+    if lint_only || format_only
+        no_run = true
+        no_hash = true
+        if output != null
+            system.out.println("Warning: -o is ignored in lint/format mode.")
+        end
+        if executor != "cs "
+            system.out.println("Warning: -d is ignored in lint/format mode.")
+        end
+        if explicit_csym
+            system.out.println("Warning: -g is ignored in lint/format mode.")
+        end
+    end
+    if repl && (lint_only || format_only)
+        system.out.println("Error: -l/-F is incompatible with REPL mode.")
+        return 1
     end
     if repl
         var instance = new repl_instance
@@ -422,6 +473,9 @@ function run_ecs(cmd_args)
                     if name != null && !name.empty()
                         var mtime = ifs.getline().to_number()
                         if mtime == system.file.mtime(file_name)
+                            if csx_path != null
+                                compiler_args += " -i " + csx_path
+                            end
                             return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + name + arguments))
                         end
                     end
@@ -431,12 +485,44 @@ function run_ecs(cmd_args)
             end
         end
     end
+    # Lint-only mode (lint_file does its own parsing)
+    if lint_only
+        var result = ecs_lint.lint_file(file_name)
+        if result != null
+            result[0].print_report()
+            if result[0].count_by_severity(ecs_lint.SEVERITY_ERROR) > 0
+                return 1
+            end
+        else
+            return 1
+        end
+        return 0
+    end
     var parser = new parsergen.generator
     if unicode != null
         parser.unicode_cvt = setup_unicode(unicode)
         if exit_code != -1
             return exit_code
         end
+    end
+    # Format mode (uses format-specific grammar with com tokens)
+    if format_only
+        var cvt = null
+        if unicode != null
+            cvt = parser.unicode_cvt
+        end
+        var formatted = ecs_format.format_file(file_name, cvt)
+        if formatted == null
+            return 1
+        end
+        if format_dry_run
+            system.out.print(formatted)
+        else
+            var ofs = iostream.ofstream(file_name)
+            ofs.print(formatted)
+            system.out.println(file_name + ": formatted.")
+        end
+        return 0
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
     parser.from_file(file_name)
@@ -473,7 +559,9 @@ function run_ecs(cmd_args)
                     foreach it in parser.code_buff do csym_ofs.println(it)
                 end
                 if !no_hash
-                    iostream.ofstream("./.ecs_output/" + file_hash).println(target_name)
+                    var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
+                    ofs.println(target_name)
+                    ofs.println(system.file.mtime(file_name))
                 end
                 if splash != null
                     system.out.println(splash)
@@ -504,7 +592,7 @@ function run_ecs(cmd_args)
             return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
         end
     end
-    return 0
+    return 1
 end
 
 function main(cmd_args)

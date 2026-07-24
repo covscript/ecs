@@ -1,0 +1,129 @@
+# Unit tests: Lint rules automated verification
+import ecs_lint
+
+var passed = 0
+var failed = 0
+
+function assert(condition, msg)
+    if condition
+        ++passed
+    else
+        system.out.println("FAIL: " + msg)
+        ++failed
+    end
+end
+
+function assert_eq(actual, expected, msg)
+    if actual == expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected " + to_string(expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+function assert_ge(actual, min_expected, msg)
+    if actual >= min_expected
+        ++passed
+    else
+        system.out.println("FAIL: " + msg + " -- expected >= " + to_string(min_expected) + ", got " + to_string(actual))
+        ++failed
+    end
+end
+
+var result = ecs_lint.lint_file("tests/test_lint.ecs")
+assert(result != null, "lint_file returns non-null result")
+if result == null
+    system.out.println("Test: lint rules  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+    if failed > 0
+        system.exit(1)
+    end
+    return
+end
+
+var lint = result[0]
+var issues = result[1]
+
+assert(typeid lint == typeid ecs_lint.linter, "result[0] is a linter")
+assert(typeid issues == typeid array, "result[1] is an array (issues)")
+
+var function_naming_count = 0
+var variable_naming_count = 0
+var constant_naming_count = 0
+var class_naming_count = 0
+var unreachable_code_count = 0
+var empty_block_count = 0
+var trailing_whitespace_count = 0
+var consecutive_blank_lines_count = 0
+var indentation_count = 0
+var useless_expression_count = 0
+var error_count = 0
+var warning_count = 0
+var info_count = 0
+
+foreach iss in issues
+    if iss.rule_name == "function_naming"
+        ++function_naming_count
+    end
+    if iss.rule_name == "variable_naming"
+        ++variable_naming_count
+    end
+    if iss.rule_name == "constant_naming"
+        ++constant_naming_count
+    end
+    if iss.rule_name == "class_naming"
+        ++class_naming_count
+    end
+    if iss.rule_name == "unreachable_code"
+        ++unreachable_code_count
+    end
+    if iss.rule_name == "empty_block"
+        ++empty_block_count
+    end
+    if iss.rule_name == "trailing_whitespace"
+        ++trailing_whitespace_count
+    end
+    if iss.rule_name == "consecutive_blank_lines"
+        ++consecutive_blank_lines_count
+    end
+    if iss.rule_name == "indentation_consistency"
+        ++indentation_count
+    end
+    if iss.rule_name == "useless_expression"
+        ++useless_expression_count
+    end
+    if iss.severity == ecs_lint.SEVERITY_ERROR
+        ++error_count
+    end
+    if iss.severity == ecs_lint.SEVERITY_WARNING
+        ++warning_count
+    end
+    if iss.severity == ecs_lint.SEVERITY_INFO
+        ++info_count
+    end
+end
+
+assert_ge(function_naming_count, 1, "detects function_naming violations")
+assert_ge(variable_naming_count, 1, "detects variable_naming violations")
+assert_ge(constant_naming_count, 1, "detects constant_naming violations")
+assert_ge(class_naming_count, 1, "detects class_naming violations")
+assert_ge(unreachable_code_count, 1, "detects unreachable_code errors")
+assert_ge(empty_block_count, 1, "detects empty_block warnings")
+assert_ge(trailing_whitespace_count, 1, "detects trailing_whitespace warnings")
+assert_ge(consecutive_blank_lines_count, 1, "detects consecutive_blank_lines info")
+assert_eq(indentation_count, 0, "no indentation_consistency issues in test file")
+assert_ge(useless_expression_count, 1, "detects useless_expression warnings")
+
+assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_ERROR), error_count, "count_by_severity(error) matches")
+assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_WARNING), warning_count, "count_by_severity(warning) matches")
+assert_eq(lint.count_by_severity(ecs_lint.SEVERITY_INFO), info_count, "count_by_severity(info) matches")
+
+assert_ge(error_count, 1, "has at least one severity_error")
+assert_ge(warning_count, 6, "has at least six severity_warning")
+assert_ge(issues.size, 7, "total issues >= 7")
+
+system.out.println("")
+system.out.println("Test: lint rules  -- " + to_string(passed) + " passed, " + to_string(failed) + " failed")
+if failed > 0
+    system.exit(1)
+end

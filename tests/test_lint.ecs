@@ -1,0 +1,41 @@
+# Linter test file - intentionally contains style issues for lint verification
+# === Naming convention violations ===
+function CamelCase()
+    return 1
+end
+var BadName = 2
+constant bad_constant = 3
+class BadClass
+    var x = 0
+end
+# === Unreachable code ===
+function unreachable_test()
+    return 1
+    var dead_code = 2
+end
+# === Empty block ===
+if true
+    # empty
+end
+var trailing = 1  
+# === Consecutive blank lines (intentional) ===
+
+
+
+var a = 1
+var b = 2
+# === Useless expression ===
+var c = 1
+c
+# === Properly formatted code (should pass clean) ===
+function good_function(x, y)
+    var result = x + y
+    foreach item in result
+        if item > 0
+            return item
+        else
+            continue
+        end
+    end
+    return result
+end

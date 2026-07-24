@@ -1,0 +1,14 @@
+{
+    "Type": "Package",
+    "Name": "ecs_format",
+    "Info": "Extended CovScript(ECS Lang) Formatter",
+    "Author": "Michael Lee",
+    "Version": "1.0.0",
+    "Target": "imports/ecs_format.csp",
+    "Dependencies": [
+        "parsergen",
+        "regex",
+        "ecs_parser",
+        "ecs_lint"
+    ]
+}

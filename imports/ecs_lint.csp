@@ -1,0 +1,806 @@
+# ECS Linter & Formatter v1.0.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Copyright (C) 2017-2026 Michael Lee(李登淳)
+#
+# Email:   mikecovlee@163.com
+# Github:  https://github.com/mikecovlee
+# Website: http://covscript.org.cn
+
+package ecs_lint
+
+import parsergen, ecs_parser
+
+# ============================================================
+#  Severity Levels
+# ============================================================
+
+constant SEVERITY_ERROR = "error"
+constant SEVERITY_WARNING = "warning"
+constant SEVERITY_INFO = "info"
+
+# ============================================================
+#  Issue
+# ============================================================
+
+struct issue
+    var pos = {0, 0}
+    var message = ""
+    var severity = ""
+    var rule_name = ""
+end
+
+# ============================================================
+#  Lint Context
+# ============================================================
+
+struct lint_context
+    var file_name = ""
+    var code_buff = new array
+    var issues = new array
+
+    function add_issue(pos, message, severity, rule_name)
+        var iss = new issue
+        iss.pos = pos
+        iss.message = message
+        iss.severity = severity
+        iss.rule_name = rule_name
+        this.issues.push_back(iss)
+    end
+end
+
+# ============================================================
+#  Helpers
+# ============================================================
+
+function get_pos(nodes)
+    # Walk into nested syntax trees to find the first token
+    var current = nodes
+    while !current.empty() && typeid current[0] == typeid parsergen.syntax_tree
+        current = current[0].nodes
+    end
+    if !current.empty() && typeid current[0] == typeid parsergen.token_type
+        return current[0].pos
+    else
+        return {0, 0}
+    end
+end
+
+function is_snake_case(name)
+    for i = 0, i < name.size, ++i
+        var code = to_integer(name[i])
+        if code >= 65 && code <= 90
+            return false
+        end
+    end
+    return true
+end
+
+function is_upper_snake_case(name)
+    for i = 0, i < name.size, ++i
+        var code = to_integer(name[i])
+        if code >= 97 && code <= 122
+            return false
+        end
+    end
+    return true
+end
+
+
+# ============================================================
+#  Lint Rules
+# ============================================================
+
+function rule_function_naming(ctx, nodes)
+    # nodes: function-stmt children
+    # Pattern: "function" id "(" ... ")" ...
+    var idx = 0
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "function"
+        ++idx
+    end
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
+        var name = nodes[idx].data
+        if !is_snake_case(name)
+            ctx.add_issue(nodes[idx].pos, "Function name '" + name + "' should be snake_case.", SEVERITY_WARNING, "function_naming")
+        end
+    end
+end
+
+function rule_async_function_naming(ctx, nodes)
+    var idx = 0
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "async"
+        ++idx
+    end
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "function"
+        ++idx
+    end
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
+        var name = nodes[idx].data
+        if !is_snake_case(name)
+            ctx.add_issue(nodes[idx].pos, "Function name '" + name + "' should be snake_case.", SEVERITY_WARNING, "function_naming")
+        end
+    end
+end
+
+function rule_variable_naming(ctx, nodes)
+    # nodes: var-stmt children
+    # Pattern: ("var"|"link"|"constant") (id ... | var-list | var-bind)
+    var idx = 0
+    var decl_kind = ""
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+        decl_kind = nodes[idx].data
+        ++idx
+    end
+    # var-def
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "var-def"
+        var def_nodes = nodes[idx].nodes
+        if decl_kind == "constant"
+            # Check constant naming
+            check_var_names(ctx, def_nodes, true)
+        else
+            # Check var/link naming
+            check_var_names(ctx, def_nodes, false)
+        end
+    end
+end
+
+function check_var_names(ctx, def_nodes, is_constant)
+    var didx = 0
+    if didx < def_nodes.size && typeid def_nodes[didx] == typeid parsergen.syntax_tree
+        if def_nodes[didx].root == "var-bind"
+            check_var_bind(ctx, def_nodes[didx].nodes, is_constant)
+            return
+        end
+        if def_nodes[didx].root == "var-list"
+            check_var_list(ctx, def_nodes[didx].nodes, is_constant)
+        end
+    end
+end
+
+function check_var_bind(ctx, nodes, is_constant)
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.token_type && nodes[i].type == "id"
+            var name = nodes[i].data
+            if is_constant
+                if !is_upper_snake_case(name)
+                    ctx.add_issue(nodes[i].pos, "Constant name '" + name + "' should be UPPER_SNAKE_CASE.", SEVERITY_WARNING, "constant_naming")
+                end
+            else
+                if !is_snake_case(name)
+                    ctx.add_issue(nodes[i].pos, "Variable name '" + name + "' should be snake_case.", SEVERITY_WARNING, "variable_naming")
+                end
+            end
+        end
+        if typeid nodes[i] == typeid parsergen.syntax_tree
+            check_var_bind(ctx, nodes[i].nodes, is_constant)
+        end
+    end
+end
+
+function check_var_list(ctx, nodes, is_constant)
+    var idx = 0
+    while idx < nodes.size
+        if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
+            var name = nodes[idx].data
+            if is_constant
+                if !is_upper_snake_case(name)
+                    ctx.add_issue(nodes[idx].pos, "Constant name '" + name + "' should be UPPER_SNAKE_CASE.", SEVERITY_WARNING, "constant_naming")
+                end
+            else
+                if !is_snake_case(name)
+                    ctx.add_issue(nodes[idx].pos, "Variable name '" + name + "' should be snake_case.", SEVERITY_WARNING, "variable_naming")
+                end
+            end
+        end
+        # Skip to next comma or end
+        ++idx
+        while idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree
+            ++idx
+        end
+        if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == ","
+            ++idx
+        end
+    end
+end
+
+function rule_class_naming(ctx, nodes)
+    # nodes: class-stmt children
+    # Pattern: ("class"|"struct") id ...
+    var idx = 0
+    # skip "class" or "struct"
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type
+        ++idx
+    end
+    if idx < nodes.size && typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "id"
+        var name = nodes[idx].data
+        if !is_snake_case(name)
+            ctx.add_issue(nodes[idx].pos, "Class/struct name '" + name + "' should be snake_case.", SEVERITY_WARNING, "class_naming")
+        end
+    end
+end
+
+function check_empty_stmts(ctx, node, first_pos, keyword_name)
+    if node.root == "stmts"
+        var has_stmt = false
+        for j = 0, j < node.nodes.size, ++j
+            if typeid node.nodes[j] == typeid parsergen.syntax_tree && node.nodes[j].root == "statement"
+                has_stmt = true
+                break
+            end
+        end
+        if !has_stmt
+            ctx.add_issue(first_pos, "Empty " + keyword_name + " block body.", SEVERITY_WARNING, "empty_block")
+        end
+    else
+        if node.root == "decl-stmts"
+            var has_decl = false
+            for j = 0, j < node.nodes.size, ++j
+                if typeid node.nodes[j] == typeid parsergen.syntax_tree && node.nodes[j].root == "declaration"
+                    has_decl = true
+                    break
+                end
+            end
+            if !has_decl
+                ctx.add_issue(first_pos, "Empty " + keyword_name + " block body.", SEVERITY_WARNING, "empty_block")
+            end
+        else
+            for j = 0, j < node.nodes.size, ++j
+                if typeid node.nodes[j] == typeid parsergen.syntax_tree
+                    check_empty_stmts(ctx, node.nodes[j], first_pos, keyword_name)
+                end
+            end
+        end
+    end
+end
+
+function rule_empty_block(ctx, nodes)
+    var first_pos = {0, 0}
+    var keyword_name = "block"
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.token_type
+            if first_pos[1] == 0
+                first_pos = nodes[i].pos
+            end
+            if keyword_name == "block" && nodes[i].data != "endl" && nodes[i].data != "async"
+                keyword_name = nodes[i].data
+            end
+        end
+        if typeid nodes[i] == typeid parsergen.syntax_tree
+            check_empty_stmts(ctx, nodes[i], first_pos, keyword_name)
+        end
+    end
+end
+
+function rule_unreachable_code(ctx, nodes)
+    # Check if there are statements after return/throw/break/continue
+    # within the same stmts sequence
+    var seen_terminator = false
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "statement"
+            var stmt_nodes = nodes[i].nodes
+            if !stmt_nodes.empty()
+                var first = stmt_nodes[0]
+                if typeid first == typeid parsergen.syntax_tree
+                    if first.root == "return-stmt" || first.root == "throw-stmt" || first.root == "control-stmt"
+                        seen_terminator = true
+                    else
+                        if seen_terminator
+                            ctx.add_issue(get_pos(stmt_nodes), "Unreachable code after return, throw, break or continue.", SEVERITY_ERROR, "unreachable_code")
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+function is_side_effect_free(nodes)
+    for i = 0, i < nodes.size, ++i
+        if typeid nodes[i] == typeid parsergen.syntax_tree
+            var root = nodes[i].root
+            if root == "fcall" || root == "index"
+                return false
+            end
+            if root == "asi-op"
+                return false
+            end
+            if root == "unary-op"
+                if !nodes[i].nodes.empty()
+                    var op = nodes[i].nodes[0].data
+                    if op == "++" || op == "--"
+                        return false
+                    end
+                end
+            end
+            if root == "postfix-expr"
+                if !nodes[i].nodes.empty()
+                    var pf = nodes[i].nodes[0].data
+                    if pf == "++" || pf == "--"
+                        return false
+                    end
+                end
+            end
+            if !is_side_effect_free(nodes[i].nodes)
+                return false
+            end
+        end
+        if typeid nodes[i] == typeid parsergen.token_type
+            var data = nodes[i].data
+            if data == "new" || data == "gcnew"
+                return false
+            end
+        end
+    end
+    return true
+end
+
+function rule_useless_expression(ctx, nodes)
+    if nodes.empty()
+        return
+    end
+    if is_side_effect_free(nodes)
+        var pos = get_pos(nodes)
+        ctx.add_issue(pos, "Useless expression with no side effect.", SEVERITY_WARNING, "useless_expression")
+    end
+end
+
+# === Source-level rules (operate on code_buff, not AST) ===
+
+function rule_trailing_whitespace(ctx)
+    for i = 0, i < ctx.code_buff.size, ++i
+        var line = ctx.code_buff[i]
+        var line_len = line.size
+        # Remove trailing \n for check
+        if line_len > 0 && line[line_len - 1] == '\n'
+            --line_len
+        end
+        if line_len > 0 && line[line_len - 1] == '\r'
+            --line_len
+        end
+        if line_len > 0 && (line[line_len - 1] == ' ' || line[line_len - 1] == '\t')
+            ctx.add_issue({line_len, i}, "Trailing whitespace.", SEVERITY_INFO, "trailing_whitespace")
+        end
+    end
+end
+
+function rule_consecutive_blank_lines(ctx)
+    var blank_count = 0
+    for i = 0, i < ctx.code_buff.size, ++i
+        var line = ctx.code_buff[i]
+        var is_blank = true
+        for j = 0, j < line.size, ++j
+            var ch = line[j]
+            if ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n'
+                is_blank = false
+                break
+            end
+        end
+        if is_blank
+            ++blank_count
+        else
+            if blank_count > 2
+                ctx.add_issue({1, i - blank_count}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
+            end
+            blank_count = 0
+        end
+    end
+    if blank_count > 2
+        ctx.add_issue({1, ctx.code_buff.size - blank_count}, "Too many consecutive blank lines (" + to_string(blank_count) + ").", SEVERITY_INFO, "consecutive_blank_lines")
+    end
+end
+
+function rule_indentation_consistency(ctx)
+    var has_tabs = false
+    var has_spaces = false
+    for i = 0, i < ctx.code_buff.size, ++i
+        var line = ctx.code_buff[i]
+        var in_indent = true
+        for j = 0, j < line.size, ++j
+            var ch = line[j]
+            if ch == '\t'
+                if in_indent
+                    has_tabs = true
+                end
+            end
+            if ch == ' '
+                if in_indent
+                    has_spaces = true
+                end
+            end
+            if ch != ' ' && ch != '\t' && ch != '\r' && ch != '\n'
+                in_indent = false
+            end
+        end
+    end
+    if has_tabs && has_spaces
+        ctx.add_issue({1, 1}, "Mixed tabs and spaces in indentation.", SEVERITY_WARNING, "indentation_consistency")
+    end
+end
+
+# ============================================================
+#  Linter — AST Walker + Rule Engine
+# ============================================================
+
+class linter
+    var ctx = null
+
+    function run(file_name, code_buff, ast)
+        this.ctx = new lint_context
+        this.ctx.file_name = file_name
+        this.ctx.code_buff = code_buff
+        # Source-level checks
+        rule_trailing_whitespace(this.ctx)
+        rule_consecutive_blank_lines(this.ctx)
+        rule_indentation_consistency(this.ctx)
+        # Walk AST
+        if !ast.nodes.empty()
+            this.visit_begin(ast.nodes)
+        end
+        return this.ctx.issues
+    end
+
+    function print_report()
+        if this.ctx.issues.empty()
+            return
+        end
+        var errors = new array
+        foreach iss in this.ctx.issues
+            var err = new parsergen.lex_error
+            err.text = iss.severity + ": [" + iss.rule_name + "] " + iss.message
+            err.pos = iss.pos
+            errors.push_back(err)
+        end
+        parsergen.print_error(this.ctx.file_name, this.ctx.code_buff, errors)
+    end
+
+    function count_by_severity(severity)
+        var count = 0
+        foreach iss in this.ctx.issues
+            if iss.severity == severity
+                ++count
+            end
+        end
+        return count
+    end
+
+    # === AST Dispatch ===
+
+    function visit_node(nodes)
+        if nodes.empty()
+            return
+        end
+        var idx = 0
+        while idx < nodes.size
+            var node = nodes[idx]
+            if typeid node == typeid parsergen.syntax_tree
+                var root = node.root
+                # Dispatch to specific visitor
+                block
+                    var matched = false
+                    if !matched && root == "begin"
+                        matched = true
+                        this.visit_begin(node.nodes)
+                    end
+                    if !matched && root == "stmts"
+                        matched = true
+                        this.visit_stmts(node.nodes)
+                    end
+                    if !matched && root == "decl-stmts"
+                        matched = true
+                        this.visit_decl_stmts(node.nodes)
+                    end
+                    if !matched && root == "statement"
+                        matched = true
+                        this.visit_statement(node.nodes)
+                    end
+                    if !matched && root == "declaration"
+                        matched = true
+                        this.visit_declaration(node.nodes)
+                    end
+                    if !matched && root == "var-stmt"
+                        matched = true
+                        this.visit_var_stmt(node.nodes)
+                    end
+                    if !matched && root == "function-stmt"
+                        matched = true
+                        this.visit_function_stmt(node.nodes)
+                    end
+                    if !matched && root == "async-function-stmt"
+                        matched = true
+                        this.visit_async_function_stmt(node.nodes)
+                    end
+                    if !matched && root == "class-stmt"
+                        matched = true
+                        this.visit_class_stmt(node.nodes)
+                    end
+                    if !matched && root == "if-stmt"
+                        matched = true
+                        this.visit_if_stmt(node.nodes)
+                    end
+                    if !matched && root == "while-stmt"
+                        matched = true
+                        this.visit_while_stmt(node.nodes)
+                    end
+                    if !matched && root == "loop-stmt"
+                        matched = true
+                        this.visit_loop_stmt(node.nodes)
+                    end
+                    if !matched && root == "for-stmt"
+                        matched = true
+                        this.visit_for_stmt(node.nodes)
+                    end
+                    if !matched && root == "foreach-stmt"
+                        matched = true
+                        this.visit_foreach_stmt(node.nodes)
+                    end
+                    if !matched && root == "switch-stmt"
+                        matched = true
+                        this.visit_switch_stmt(node.nodes)
+                    end
+                    if !matched && root == "try-stmt"
+                        matched = true
+                        this.visit_try_stmt(node.nodes)
+                    end
+                    if !matched && root == "namespace-stmt"
+                        matched = true
+                        this.visit_namespace_stmt(node.nodes)
+                    end
+                    if !matched && root == "block-stmt"
+                        matched = true
+                        this.visit_block_stmt(node.nodes)
+                    end
+                    if !matched && root == "return-stmt"
+                        matched = true
+                        this.visit_return_stmt(node.nodes)
+                    end
+                    if !matched && root == "throw-stmt"
+                        matched = true
+                        this.visit_throw_stmt(node.nodes)
+                    end
+                    if !matched && root == "control-stmt"
+                        matched = true
+                        this.visit_control_stmt(node.nodes)
+                    end
+                    if !matched && root == "yield-stmt"
+                        matched = true
+                        this.visit_yield_stmt(node.nodes)
+                    end
+                    if !matched && root == "expr-stmt"
+                        matched = true
+                        this.visit_expr_stmt(node.nodes)
+                    end
+                    if !matched
+                        # For expression-related nodes, just recurse into children
+                        this.visit_node(node.nodes)
+                    end
+                end
+            end
+            ++idx
+        end
+    end
+
+    # === Top-level ===
+
+    function visit_begin(nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_stmts(nodes)
+        # Check unreachable code
+        rule_unreachable_code(this.ctx, nodes)
+        # Recurse into children
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "statement"
+                this.visit_statement(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_decl_stmts(nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree && nodes[i].root == "declaration"
+                this.visit_declaration(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_statement(nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_declaration(nodes)
+        this.visit_node(nodes)
+    end
+
+    # === Declarations ===
+
+    function visit_var_stmt(nodes)
+        rule_variable_naming(this.ctx, nodes)
+        # Recurse into var-def and initializers
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_function_stmt(nodes)
+        rule_function_naming(this.ctx, nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_async_function_stmt(nodes)
+        rule_async_function_naming(this.ctx, nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_class_stmt(nodes)
+        rule_class_naming(this.ctx, nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "decl-stmts"
+                    this.visit_decl_stmts(nodes[i].nodes)
+                else
+                    this.visit_node(nodes[i].nodes)
+                end
+            end
+        end
+    end
+
+    # === Control Flow ===
+
+    function visit_if_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "stmts"
+                    rule_unreachable_code(this.ctx, nodes[i].nodes)
+                end
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_while_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "stmts"
+                    rule_unreachable_code(this.ctx, nodes[i].nodes)
+                end
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_loop_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "stmts"
+                    rule_unreachable_code(this.ctx, nodes[i].nodes)
+                end
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_for_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_foreach_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_switch_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_try_stmt(nodes)
+        # Check empty catch blocks
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "stmts"
+                    rule_unreachable_code(this.ctx, nodes[i].nodes)
+                end
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    # === Other statements ===
+
+    function visit_namespace_stmt(nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "decl-stmts"
+                    this.visit_decl_stmts(nodes[i].nodes)
+                else
+                    this.visit_node(nodes[i].nodes)
+                end
+            end
+        end
+    end
+
+    function visit_block_stmt(nodes)
+        rule_empty_block(this.ctx, nodes)
+        for i = 0, i < nodes.size, ++i
+            if typeid nodes[i] == typeid parsergen.syntax_tree
+                if nodes[i].root == "stmts"
+                    rule_unreachable_code(this.ctx, nodes[i].nodes)
+                end
+                this.visit_node(nodes[i].nodes)
+            end
+        end
+    end
+
+    function visit_return_stmt(nodes)
+        # For unreachable code detection, handled in visit_stmts
+        this.visit_node(nodes)
+    end
+
+    function visit_throw_stmt(nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_control_stmt(nodes)
+        # break/continue — for unreachable code detection
+        this.visit_node(nodes)
+    end
+
+    function visit_yield_stmt(nodes)
+        this.visit_node(nodes)
+    end
+
+    function visit_expr_stmt(nodes)
+        rule_useless_expression(this.ctx, nodes)
+        this.visit_node(nodes)
+    end
+end
+
+
+# ============================================================
+#  Public API
+# ============================================================
+
+function lint_file(file_name)
+    var parser = new parsergen.generator
+    parser.add_grammar("ecs-lang", ecs_parser.grammar)
+    parser.from_file(file_name)
+    if parser.ast == null
+        system.out.println("Error: Failed to parse file '" + file_name + "'.")
+        return null
+    end
+    var lint = new linter
+    var issues = lint.run(file_name, parser.code_buff, parser.ast)
+    return {lint, issues}
+end
+
+var version = "1.0.0"

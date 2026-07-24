@@ -40,7 +40,7 @@ package ecs_generator
 # Master
 
 namespace ecs_info
-    constant version = "4.1.0 Cuon alpinus(Stable) Build 2"
+    constant version = "4.1.0 Cuon alpinus(Stable) Build 3"
     constant std_version = "260702"
     constant min_runtime = "260702"
 end
@@ -1017,15 +1017,17 @@ class generator
     function visit_lambda_body(nodes)
         var idx = 0
         if typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].data == "{"
-            # Brace body: { stmts... }
+            # Brace body: { stmts }
             ++idx
-            while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "statement")
-                if stack.front.body_stmts == null
-                    stack.front.body_stmts = new array
-                end
-                stack.front.body_stmts.push_back(nodes[idx++].nodes)
-                while idx < nodes.size && (typeid nodes[idx] == typeid parsergen.token_type && nodes[idx].type == "endl")
-                    ++idx
+            if idx < nodes.size && typeid nodes[idx] == typeid parsergen.syntax_tree && nodes[idx].root == "stmts"
+                var stmts_nodes = nodes[idx].nodes
+                for i = 0, i < stmts_nodes.size, ++i
+                    if typeid stmts_nodes[i] == typeid parsergen.syntax_tree && stmts_nodes[i].root == "statement"
+                        if stack.front.body_stmts == null
+                            stack.front.body_stmts = new array
+                        end
+                        stack.front.body_stmts.push_back(stmts_nodes[i].nodes)
+                    end
                 end
             end
         else
@@ -2529,7 +2531,7 @@ class generator
                 print_indent()
                 println("end", dat.pos)
             else
-                println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + "__", dat.pos)
+                println("struct __" + ecs_prefix + "ecs_lambda_impl_" + to_string(lambda_base + i + 1) + "__ extends " + ecs_prefix + "ecs.lambda_base", dat.pos)
                 foreach it in dat.capture_list
                     print_indent()
                     println("var " + it.first + " = null", dat.pos)
@@ -2620,6 +2622,7 @@ class generator
     end
     function repl_run(ast)
         slice_ext = false
+        lambda_base = 0
         indent = -1
         recursion_depth = 0
         async_depth = 0
@@ -2630,14 +2633,16 @@ class generator
         try
             visit_begin(ast.nodes)
         catch e
+            lambda_list = new array
+            stack = new array
+            indent = -1
+            recursion_depth = 0
+            async_depth = 0
+            in_struct_depth = 0
             if e.what == "ECS_ERROR"
-                lambda_list = new array
-                stack = new array
-                indent = -1
-                recursion_depth = 0
-                async_depth = 0
-                in_struct_depth = 0
                 return null
+            else
+                throw e
             end
         end
         var header = new iostream.char_buff
