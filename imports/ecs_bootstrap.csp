@@ -498,11 +498,6 @@ function run_ecs(cmd_args)
         end
         return 0
     end
-        else
-            return 1
-        end
-        return 0
-    end
     var parser = new parsergen.generator
     if unicode != null
         parser.unicode_cvt = setup_unicode(unicode)
