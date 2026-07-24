@@ -525,61 +525,54 @@ function run_ecs(cmd_args)
         return 0
     end
     parser.add_grammar("ecs-lang", ecs_parser.grammar)
+    parser.show_prompt = false
     parser.from_file(file_name)
-    if parser.ast != null
-        if match(lcs_reg, file_name)
-            if csx_path != null
-                compiler_args += " -i " + csx_path
-            end
-            return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + file_name + arguments))
+    if parser.ast == null
+        var all_errors = new array
+        if parser.lexer != null
+            foreach it in parser.lexer.error_log do all_errors.push_back(it)
         end
-        var codegen = new ecs_generator.generator
+        if all_errors.empty() && parser.token_buff != null
+            var recovery = new parsergen.recovering_parser_type
+            recovery.init(ecs_parser.grammar.stx)
+            recovery.parse_with_recovery(parser.token_buff)
+            foreach it in recovery.get_all_errors() do all_errors.push_back(it)
+        end
+        if !all_errors.empty()
+            all_errors.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
+            parsergen.print_error(file_name, parser.code_buff, all_errors)
+        else
+            system.out.println("Error: Failed to parse '" + file_name + "'.")
+        end
+        return 1
+    end
+    if match(lcs_reg, file_name)
         if csx_path != null
             compiler_args += " -i " + csx_path
-            codegen.ecsx_path = csx_path.split({system.path.delimiter})
         end
-        codegen.gen_dbg_info = csym
-        codegen.code_buff = parser.code_buff
-        codegen.file_name = file_name
-        codegen.minimal = minimal
-        if unicode != null
-            codegen.custom_header.push_back("@charset: " + unicode.tolower())
-        end
-        if output != null
-            var result = ecs_reg.match(file_name)
-            if !result.empty()
-                var name = output + system.path.separator + result.str(1).split({'\\', '/'})[-1]
-                var target_name = codegen.run(name, parser.ast)
-                if target_name == null
-                    return 1
-                end
-                if csym
-                    var csym_ofs = iostream.ofstream(name + ".csym")
-                    var dbg_info = "#$cSYM/1.0(" + file_name + "):"
-                    foreach it in codegen.dbg_line_map do dbg_info += it + ","
-                    dbg_info.cut(1)
-                    csym_ofs.println(dbg_info)
-                    foreach it in parser.code_buff do csym_ofs.println(it)
-                end
-                if !no_hash
-                    var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
-                    ofs.println(target_name)
-                    ofs.println(system.file.mtime(file_name))
-                end
-                if splash != null
-                    system.out.println(splash)
-                end
-                return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
-            end
-        else
-            system.path.mkdir_p("./.ecs_output/")
-            var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
+        return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + file_name + arguments))
+    end
+    var codegen = new ecs_generator.generator
+    if csx_path != null
+        compiler_args += " -i " + csx_path
+        codegen.ecsx_path = csx_path.split({system.path.delimiter})
+    end
+    codegen.gen_dbg_info = csym
+    codegen.code_buff = parser.code_buff
+    codegen.file_name = file_name
+    codegen.minimal = minimal
+    if unicode != null
+        codegen.custom_header.push_back("@charset: " + unicode.tolower())
+    end
+    if output != null
+        var result = ecs_reg.match(file_name)
+        if !result.empty()
+            var name = output + system.path.separator + result.str(1).split({'\\', '/'})[-1]
             var target_name = codegen.run(name, parser.ast)
             if target_name == null
                 return 1
             end
             if csym
-                compiler_args += " -g " + name + ".csym"
                 var csym_ofs = iostream.ofstream(name + ".csym")
                 var dbg_info = "#$cSYM/1.0(" + file_name + "):"
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
@@ -597,6 +590,31 @@ function run_ecs(cmd_args)
             end
             return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
         end
+    else
+        system.path.mkdir_p("./.ecs_output/")
+        var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
+        var target_name = codegen.run(name, parser.ast)
+        if target_name == null
+            return 1
+        end
+        if csym
+            compiler_args += " -g " + name + ".csym"
+            var csym_ofs = iostream.ofstream(name + ".csym")
+            var dbg_info = "#$cSYM/1.0(" + file_name + "):"
+            foreach it in codegen.dbg_line_map do dbg_info += it + ","
+            dbg_info.cut(1)
+            csym_ofs.println(dbg_info)
+            foreach it in parser.code_buff do csym_ofs.println(it)
+        end
+        if !no_hash
+            var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
+            ofs.println(target_name)
+            ofs.println(system.file.mtime(file_name))
+        end
+        if splash != null
+            system.out.println(splash)
+        end
+        return no_run ? 0 : system.run(process_path(executor + compiler_args + " " + target_name + arguments))
     end
     return 1
 end

@@ -143,6 +143,16 @@ jobs:
           cspkg list
 
       # ------------------------------------------------------------------ #
+      # 6.5. Grammar static analysis                                        #
+      # ------------------------------------------------------------------ #
+      - name: Grammar analysis
+        shell: bash
+        run: |
+          echo "=== Grammar Static Analysis ==="
+          cspkg install parsergen_analysis --yes
+          cs -i "$COVSCRIPT_HOME/packages" -i imports misc/check_grammar.csc
+
+      # ------------------------------------------------------------------ #
       # 7. Run unit tests                                                   #
       # ------------------------------------------------------------------ #
       - name: Run unit tests
@@ -187,3 +197,12 @@ jobs:
         run: |
           echo "=== Formatter Correctness Tests ==="
           bash format_tests/run.sh
+
+      # ------------------------------------------------------------------ #
+      # 10. Error recovery tests                                            #
+      # ------------------------------------------------------------------ #
+      - name: Error recovery tests
+        shell: bash
+        run: |
+          echo "=== Error Recovery Tests ==="
+          bash tests/run_recovery.sh
