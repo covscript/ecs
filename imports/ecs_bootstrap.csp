@@ -490,6 +490,14 @@ function run_ecs(cmd_args)
         var result = ecs_lint.lint_file(file_name)
         if result != null
             result[0].print_report()
+            if result[0].count_by_severity(ecs_lint.SEVERITY_ERROR) > 0
+                return 1
+            end
+        else
+            return 1
+        end
+        return 0
+    end
         else
             return 1
         end
