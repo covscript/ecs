@@ -1,0 +1,22 @@
+function   badly_formatted( x,y )
+var result=x+y
+    if result>10
+return result
+    else
+return 0
+end
+end
+
+class   my_class
+var value=0
+function   set_value(self,v)
+self.value=v
+end
+end
+
+var obj=new my_class
+obj.set_value(42)
+var sum=badly_formatted(3,4)
+foreach   i   in   {1,2,3}
+    sum+=i
+end

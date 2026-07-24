@@ -178,3 +178,12 @@ jobs:
         run: |
           echo "=== Codegen Correctness Tests ==="
           bash codegen_tests/run.sh
+
+      # ------------------------------------------------------------------ #
+      # 9. Formatter correctness tests                                      #
+      # ------------------------------------------------------------------ #
+      - name: Formatter correctness tests
+        shell: bash
+        run: |
+          echo "=== Formatter Correctness Tests ==="
+          bash format_tests/run.sh

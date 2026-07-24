@@ -55,7 +55,7 @@ class repl_instance
         parser.on_eof_hook = on_eof_hook
         codegen.code_buff := code_buff
         codegen.file_name = "<REPL_ENV>"
-        codegen.minmal = true
+        codegen.minimal = true
     end
     function readline(prompt)
         var line = null
@@ -168,7 +168,7 @@ function show_help()
         "Common Options:\n" +
         "    Option       Function\n" +
         "   -h            Show help information\n" +
-        "   -v            Show version infomation\n" +
+        "   -v            Show version information\n" +
         "   -u <CHARSET>  Set unicode charset\n" +
         "                 CHARSET = {\"AUTO\", \"UTF8\", \"GBK\"}\n" +
         "   -i <PATH>     Append import path\n"
@@ -185,7 +185,7 @@ var executor = "cs "
 var no_hash = false
 var csx_path = null
 var unicode = null
-var minmal = false
+var minimal = false
 var no_run = false
 var silent = false
 var splash = null
@@ -216,7 +216,7 @@ function process_args(cmd_args)
                 no_hash = true
             end
             case "-m"
-                minmal = true
+                minimal = true
             end
             case "-c"
                 no_run = true
@@ -398,7 +398,7 @@ function run_ecs(cmd_args)
     no_hash = false
     csx_path = null
     unicode = null
-    minmal = false
+    minimal = false
     no_run = false
     silent = false
     splash = null
@@ -465,7 +465,7 @@ function run_ecs(cmd_args)
     if !no_hash
         file_hash = codec.sha256.hash_file(file_name) + ".ecs_cache"
         if output == null
-            minmal = true
+            minimal = true
             if system.file.exist("./.ecs_output/" + file_hash)
                 try
                     var ifs = iostream.ifstream("./.ecs_output/" + file_hash)
@@ -541,7 +541,7 @@ function run_ecs(cmd_args)
         codegen.gen_dbg_info = csym
         codegen.code_buff = parser.code_buff
         codegen.file_name = file_name
-        codegen.minmal = minmal
+        codegen.minimal = minimal
         if unicode != null
             codegen.custom_header.push_back("@charset: " + unicode.tolower())
         end
@@ -550,6 +550,9 @@ function run_ecs(cmd_args)
             if !result.empty()
                 var name = output + system.path.separator + result.str(1).split({'\\', '/'})[-1]
                 var target_name = codegen.run(name, parser.ast)
+                if target_name == null
+                    return 1
+                end
                 if csym
                     var csym_ofs = iostream.ofstream(name + ".csym")
                     var dbg_info = "#$cSYM/1.0(" + file_name + "):"
@@ -572,6 +575,9 @@ function run_ecs(cmd_args)
             system.path.mkdir_p("./.ecs_output/")
             var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
             var target_name = codegen.run(name, parser.ast)
+            if target_name == null
+                return 1
+            end
             if csym
                 compiler_args += " -g " + name + ".csym"
                 var csym_ofs = iostream.ofstream(name + ".csym")
