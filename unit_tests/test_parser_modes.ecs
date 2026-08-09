@@ -1,6 +1,13 @@
 # Unit tests: Parser strict/non-strict mode coverage
 import ecs
-import ecs_parser, parsergen, regex
+import ecs_parser, regex
+
+var _pg_impl = "parsergen"
+try
+    _pg_impl = system.getenv("PARSERGEN_IMPL")
+catch e
+end
+var parsergen = context.import(runtime.get_import_path(), _pg_impl)
 
 var passed = 0
 var failed = 0
@@ -59,26 +66,22 @@ assert(key_exists(stx_s, "begin"), "strict stx has 'begin'")
 assert(key_exists(stx_s, "stmts"), "strict stx has 'stmts'")
 
 # === Parse with non-strict grammar (default) ===
-var grammar_ns = new parsergen.grammar
-grammar_ns.ext = ".*\\.(csp|csc|ecs|ecsx)"
-grammar_ns.lex = ecs_parser.get_lexical(regex.build_optimize, false)
-grammar_ns.stx := ecs_parser.get_syntax(false)
+var grammar_ns = parsergen.make_grammar_from(".*\\.(csp|csc|ecs|ecsx)", ecs_parser.get_lexical_patterns(false), ecs_parser.get_syntax(false))
 
 var parser_ns = new parsergen.generator
-parser_ns.add_grammar("ecs-lang-ns", grammar_ns)
+parser_ns.set_show_prompt(false)
+parser_ns.add_language("ecs-lang-ns", "ascii", grammar_ns)
 parser_ns.from_file("unit_tests/test_functions.ecs")
-assert(parser_ns.ast != null, "non-strict mode parses test_functions.ecs")
+assert(parser_ns.get_ast() != null, "non-strict mode parses test_functions.ecs")
 
 # === Parse with strict grammar ===
-var grammar_s = new parsergen.grammar
-grammar_s.ext = ".*\\.(csp|csc|ecs|ecsx)"
-grammar_s.lex = ecs_parser.get_lexical(regex.build_optimize, true)
-grammar_s.stx := ecs_parser.get_syntax(true)
+var grammar_s = parsergen.make_grammar_from(".*\\.(csp|csc|ecs|ecsx)", ecs_parser.get_lexical_patterns(true), ecs_parser.get_syntax(true))
 
 var parser_s = new parsergen.generator
-parser_s.add_grammar("ecs-lang-s", grammar_s)
+parser_s.set_show_prompt(false)
+parser_s.add_language("ecs-lang-s", "ascii", grammar_s)
 parser_s.from_file("unit_tests/test_functions.ecs")
-assert(parser_s.ast != null, "strict mode parses test_functions.ecs")
+assert(parser_s.get_ast() != null, "strict mode parses test_functions.ecs")
 
 # === results ===
 system.out.println("")

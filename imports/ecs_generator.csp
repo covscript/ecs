@@ -45,7 +45,15 @@ namespace ecs_info
     constant min_runtime = "260702"
 end
 
-import parsergen, ecs
+import regex
+
+var _pg_impl = "parsergen"
+try
+    _pg_impl = system.getenv("PARSERGEN_IMPL")
+catch e
+end
+var parsergen = context.import(runtime.get_import_path(), _pg_impl)
+import ecs
 
 struct module_type
     var list = new array
@@ -106,16 +114,12 @@ class generator
         end
     end
     function error(pos, text)
-        var err = new parsergen.lex_error
-        err.text = text
-        err.pos = pos
+        var err = parsergen.make_lex_error(text, pos)
         parsergen.print_error(file_name, code_buff, {err})
         throw runtime.exception("ECS_ERROR")
     end
     function warning(pos, text)
-        var err = new parsergen.lex_error
-        err.text = "warning: " + text
-        err.pos = pos
+        var err = parsergen.make_lex_error("warning: " + text, pos)
         parsergen.print_error(file_name, code_buff, {err})
     end
     function print_indent()
