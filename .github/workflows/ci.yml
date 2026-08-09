@@ -142,7 +142,8 @@ jobs:
           mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
           cmake .. -DCMAKE_BUILD_TYPE=Release
           cmake --build . --target parsergen_cni -- -j$(nproc)
-          cp parsergen_cxx.cse "${{ github.workspace }}/imports/"
+          mkdir -p ../../build/imports
+          cp parsergen_cxx.cse ../../build/imports/
 
       - name: Build parsergen_cxx (Windows)
         if: runner.os == 'Windows'
@@ -159,7 +160,8 @@ jobs:
           mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
           cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
           cmake --build . --target parsergen_cni -- -j4
-          cp parsergen_cxx.cse "${{ github.workspace }}/imports/"
+          mkdir -p ../../build/imports
+          cp parsergen_cxx.cse ../../build/imports/
 
       # ------------------------------------------------------------------ #
       # 6. Install remote dependencies + build local packages                #
@@ -172,6 +174,8 @@ jobs:
           fi
           # Initialize cspkg
           cspkg install --import --yes
+          # Install parsergen_cxx extension (built from source in step 5.5)
+          cspkg build parsergen-src/csbuild/parsergen_cxx.json --install --yes
           # Build and install local packages from csbuild/
           cspkg build . --install --yes
           # Fix dependencies
