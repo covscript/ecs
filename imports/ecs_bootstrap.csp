@@ -28,7 +28,7 @@ try
 catch e
 end
 var parsergen = context.import(runtime.get_import_path(), _pg_impl)
-import ecs_parser, ecs_generator, ecs_lint, ecs_format, codec, regex
+import ecs_parser, ecs_generator, ecs_lint, ecs_format, codec
 import sdk_extension as sdk
 
 var wrapper_ver = "1.8.0"
@@ -486,7 +486,7 @@ function run_ecs(cmd_args)
     parser.add_language("ecs-lang", coding, ecs_parser.grammar)
     parser.set_show_prompt(false)
     parser.from_file(file_name)
-    if parser.ast() == null
+    if parser.get_ast() == null
         var all_errors = parser.get_lex_errors()
         if all_errors.empty()
             var tokens = parser.get_tokens()
@@ -499,7 +499,7 @@ function run_ecs(cmd_args)
         end
         if !all_errors.empty()
             all_errors.sort([](lhs, rhs)->lhs.pos[1] < rhs.pos[1])
-            parsergen.print_error(file_name, parser.code_buff(), all_errors)
+            parsergen.print_error(file_name, parser.get_code_buff(), all_errors)
         else
             system.out.println("Error: Failed to parse '" + file_name + "'.")
         end
@@ -517,7 +517,7 @@ function run_ecs(cmd_args)
         codegen.ecsx_path = csx_path.split({system.path.delimiter})
     end
     codegen.gen_dbg_info = csym
-    codegen.code_buff = parser.code_buff()
+    codegen.code_buff = parser.get_code_buff()
     codegen.file_name = file_name
     codegen.minimal = minimal
     if unicode != null
@@ -527,7 +527,7 @@ function run_ecs(cmd_args)
         var result = ecs_reg.match(file_name)
         if !result.empty()
             var name = output + system.path.separator + result.str(1).split({'\\', '/'})[-1]
-            var target_name = codegen.run(name, parser.ast())
+            var target_name = codegen.run(name, parser.get_ast())
             if target_name == null
                 return 1
             end
@@ -537,7 +537,7 @@ function run_ecs(cmd_args)
                 foreach it in codegen.dbg_line_map do dbg_info += it + ","
                 dbg_info.cut(1)
                 csym_ofs.println(dbg_info)
-                foreach it in parser.code_buff() do csym_ofs.println(it)
+                foreach it in parser.get_code_buff() do csym_ofs.println(it)
             end
             if !no_hash
                 var ofs = iostream.ofstream("./.ecs_output/" + file_hash)
@@ -552,7 +552,7 @@ function run_ecs(cmd_args)
     else
         system.path.mkdir_p("./.ecs_output/")
         var name = "./.ecs_output/" + codec.sha256.hash_str(file_name)
-        var target_name = codegen.run(name, parser.ast())
+        var target_name = codegen.run(name, parser.get_ast())
         if target_name == null
             return 1
         end
@@ -563,7 +563,7 @@ function run_ecs(cmd_args)
             foreach it in codegen.dbg_line_map do dbg_info += it + ","
             dbg_info.cut(1)
             csym_ofs.println(dbg_info)
-            foreach it in parser.code_buff() do csym_ofs.println(it)
+            foreach it in parser.get_code_buff() do csym_ofs.println(it)
         end
         if !no_hash
             var ofs = iostream.ofstream("./.ecs_output/" + file_hash)

@@ -800,12 +800,12 @@ function lint_file(file_name)
     var parser = new parsergen.generator
     parser.add_language("ecs-lang", "ascii", ecs_parser.grammar)
     parser.from_file(file_name)
-    if parser.ast() == null
+    if parser.get_ast() == null
         system.out.println("Error: Failed to parse file '" + file_name + "'.")
         return null
     end
     var lint = new linter
-    var issues = lint.run(file_name, parser.code_buff(), parser.ast())
+    var issues = lint.run(file_name, parser.get_code_buff(), parser.get_ast())
     return {lint, issues}
 end
 
