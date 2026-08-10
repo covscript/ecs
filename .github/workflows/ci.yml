@@ -196,7 +196,7 @@ jobs:
         run: |
           echo "=== Grammar Static Analysis ==="
           cspkg install parsergen_analysis --yes
-          cs -i "$COVSCRIPT_HOME/packages" -i imports misc/check_grammar.csc
+          cs misc/check_grammar.csc
 
       # ------------------------------------------------------------------ #
       # 7. Run unit tests                                                   #
