@@ -179,7 +179,7 @@ jobs:
           # Initialize cspkg
           cspkg install --import --yes
           # Install parsergen_cxx extension (built from source in step 5.5)
-          cspkg build parsergen-src/csbuild/parsergen_cxx.json --install --yes
+          cspkg build parsergen-src --install parsergen_cxx --yes
           # Build and install local packages from csbuild/
           cspkg build . --install --yes
           # Fix dependencies
