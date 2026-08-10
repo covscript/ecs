@@ -178,21 +178,28 @@ jobs:
           fi
           # Initialize cspkg
           cspkg install --import --yes
-          # Install parsergen_cxx extension (built from source in step 5.5)
-          cspkg build parsergen-src --install parsergen_cxx --yes
           # Build and install local packages from csbuild/
           cspkg build . --install --yes
           # Fix dependencies
           cspkg install --fix --yes
+          # Install parsergen_cxx extension + updated parsergen (built from source
+          # in step 5.5). Done after 'install --fix' so the newer parsergen is
+          # not reverted to the older cspkg-repo version.
+          cspkg build parsergen-src --install parsergen_cxx parsergen --yes
           echo ""
           echo "=== Installed packages ==="
           cspkg list
 
       # ------------------------------------------------------------------ #
       # 6.5. Grammar static analysis                                        #
+      # Uses the CovScript parsergen (PARSERGEN_IMPL=parsergen): the        #
+      # analyzer is a CovScript package designed for the script-built       #
+      # grammar structure.                                                  #
       # ------------------------------------------------------------------ #
       - name: Grammar analysis
         shell: bash
+        env:
+          PARSERGEN_IMPL: parsergen
         run: |
           echo "=== Grammar Static Analysis ==="
           cspkg install parsergen_analysis --yes
