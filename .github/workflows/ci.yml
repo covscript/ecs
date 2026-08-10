@@ -134,6 +134,7 @@ jobs:
           repository: mikecovlee/parsergen
           ref: cxx_impl
           path: parsergen-src
+          submodules: recursive
 
       - name: Build parsergen_cxx (Unix)
         if: runner.os != 'Windows'
