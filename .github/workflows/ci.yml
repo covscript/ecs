@@ -139,6 +139,8 @@ jobs:
       - name: Build parsergen_cxx (Unix)
         if: runner.os != 'Windows'
         shell: bash
+        env:
+          CS_DEV_PATH: ${{ steps.sdk.outputs.cs_home }}/
         run: |
           mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
           cmake .. -DCMAKE_BUILD_TYPE=Release
@@ -158,6 +160,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
+          export CS_DEV_PATH="$(cygpath -u "${{ steps.sdk.outputs.cs_home }}")/"
           mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
           cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
           cmake --build . --target parsergen_cni -- -j4
