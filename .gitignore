@@ -2,3 +2,6 @@
 .ecs_output/
 cspkg-repo/
 imports/parsergen_cxx.cse
+# local 联调 parsergen artifacts (provided at build time, not committed)
+imports/parsergen.csp
+imports/parsergen_debug.csp
