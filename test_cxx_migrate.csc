@@ -21,6 +21,7 @@ if gen.from_file(file)
     codegen.code_buff = gen.get_code_buff()
     codegen.file_name = file
     codegen.minimal = true
+    system.path.mkdir_p("./.ecs_output/")
     var result = codegen.run("./.ecs_output/test_migrated", gen.get_ast())
     if result != null
         system.out.println("CODEGEN OK: " + result)
