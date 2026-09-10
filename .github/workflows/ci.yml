@@ -3,9 +3,10 @@
 # ecs is a CovScript-to-CovScript transpiler. This CI:
 #   1. Downloads a pre-built CovScript SDK from csbuild releases
 #   2. Configures cspkg to use the bundled package repository
-#   3. Installs remote dependencies (parsergen, regex, codec, sdk_extension)
-#   4. Builds and installs ecs/ecs_parser/ecs_generator/ecs_bootstrap from local source
-#   5. Runs non-interactive unit tests in unit_tests/
+#   3. Builds parsergen_cxx (C++ parser extension) from source
+#   4. Installs remote dependencies (parsergen, regex, codec, sdk_extension)
+#   5. Builds and installs ecs/ecs_parser/ecs_generator/ecs_bootstrap from local source
+#   6. Runs non-interactive unit tests in unit_tests/
 
 name: CI
 
@@ -122,6 +123,49 @@ jobs:
           CS_HOME="${{ steps.sdk.outputs.cs_home }}"
           echo "COVSCRIPT_HOME=${CS_HOME}" >> "$GITHUB_ENV"
           echo "${CS_HOME}/bin" >> "$GITHUB_PATH"
+          echo "PARSERGEN_IMPL=parsergen_cxx" >> "$GITHUB_ENV"
+
+      # ------------------------------------------------------------------ #
+      # 5.5. Build parsergen_cxx from source                                #
+      # ------------------------------------------------------------------ #
+      - name: Checkout parsergen
+        uses: actions/checkout@v5
+        with:
+          repository: mikecovlee/parsergen
+          ref: cxx_impl
+          path: parsergen-src
+          submodules: recursive
+
+      - name: Build parsergen_cxx (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CS_DEV_PATH: ${{ steps.sdk.outputs.cs_home }}/
+        run: |
+          mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
+          cmake -G "Unix Makefiles" .. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --target parsergen_cni --parallel 4
+          mkdir -p ../../build/imports
+          cp parsergen_cxx.cse ../../build/imports/
+
+      - name: Build parsergen_cxx (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          install: mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake make
+          path-type: inherit
+
+      - name: Build parsergen_cxx (Windows build)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          export CS_DEV_PATH="$(cygpath -u "${{ steps.sdk.outputs.cs_home }}")/"
+          mkdir -p parsergen-src/cpp/build && cd parsergen-src/cpp/build
+          cmake .. -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --target parsergen_cni -- -j4
+          mkdir -p ../../build/imports
+          cp parsergen_cxx.cse ../../build/imports/
 
       # ------------------------------------------------------------------ #
       # 6. Install remote dependencies + build local packages                #
@@ -138,9 +182,28 @@ jobs:
           cspkg build . --install --yes
           # Fix dependencies
           cspkg install --fix --yes
+          # Install parsergen_cxx extension + updated parsergen (built from source
+          # in step 5.5). Done after 'install --fix' so the newer parsergen is
+          # not reverted to the older cspkg-repo version.
+          cspkg build parsergen-src --install parsergen_cxx parsergen --yes
           echo ""
           echo "=== Installed packages ==="
           cspkg list
+
+      # ------------------------------------------------------------------ #
+      # 6.5. Grammar static analysis                                        #
+      # Uses the CovScript parsergen (PARSERGEN_IMPL=parsergen): the        #
+      # analyzer is a CovScript package designed for the script-built       #
+      # grammar structure.                                                  #
+      # ------------------------------------------------------------------ #
+      - name: Grammar analysis
+        shell: bash
+        env:
+          PARSERGEN_IMPL: parsergen
+        run: |
+          echo "=== Grammar Static Analysis ==="
+          cspkg install parsergen_analysis --yes
+          cs misc/check_grammar.csc
 
       # ------------------------------------------------------------------ #
       # 7. Run unit tests                                                   #
@@ -187,3 +250,12 @@ jobs:
         run: |
           echo "=== Formatter Correctness Tests ==="
           bash format_tests/run.sh
+
+      # ------------------------------------------------------------------ #
+      # 10. Error recovery tests                                            #
+      # ------------------------------------------------------------------ #
+      - name: Error recovery tests
+        shell: bash
+        run: |
+          echo "=== Error Recovery Tests ==="
+          bash tests/run_recovery.sh
