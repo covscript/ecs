@@ -20,14 +20,18 @@
 
 package ecs_format
 
-import parsergen, ecs_parser, regex
+import regex
+
+var _pg_impl = "parsergen"
+try
+    _pg_impl = system.getenv("PARSERGEN_IMPL")
+catch e
+end
+var parsergen = context.import(runtime.get_import_path(), _pg_impl)
+import ecs_parser
 
 function get_fmt_grammar()
-    var g = new parsergen.grammar
-    g.ext = ".*\\.(csp|csc|ecs|ecsx)"
-    g.lex = ecs_parser.get_lexical(regex.build_optimize, true)
-    g.stx := ecs_parser.get_syntax(true)
-    return g
+    return parsergen.make_grammar_from(".*\\.(csp|csc|ecs|ecsx)", ecs_parser.get_lexical_patterns(true), ecs_parser.get_syntax(true))
 end
 
 # ============================================================
@@ -1406,19 +1410,17 @@ function format_ast(file_name, code_buff, ast)
     return vis.run(file_name, code_buff, ast)
 end
 
-function format_file(file_name, unicode_cvt)
+function format_file(file_name, coding)
     # Use format-specific grammar so comments appear as "com" tokens in AST
     var parser = new parsergen.generator
-    if unicode_cvt != null
-        parser.unicode_cvt = unicode_cvt
-    end
-    parser.add_grammar("ecs-lang-fmt", get_fmt_grammar())
+    parser.set_show_prompt(false)
+    parser.add_language("ecs-lang-fmt", coding, get_fmt_grammar())
     parser.from_file(file_name)
-    if parser.ast == null
+    if parser.get_ast() == null
         system.out.println("Error: Failed to parse file '" + file_name + "'.")
         return null
     end
-    return format_ast(file_name, parser.code_buff, parser.ast)
+    return format_ast(file_name, parser.get_code_buff(), parser.get_ast())
 end
 
 var version = "1.0.0"

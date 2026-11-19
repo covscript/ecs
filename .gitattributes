@@ -1,0 +1,2 @@
+# Enforce LF line endings across the repo (match .editorconfig / CI).
+* text=auto eol=lf
