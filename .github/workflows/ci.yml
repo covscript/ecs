@@ -132,7 +132,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: mikecovlee/parsergen
-          ref: cxx_impl
+          ref: main
           path: parsergen-src
           submodules: recursive
 
